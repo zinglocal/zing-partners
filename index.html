@@ -709,9 +709,10 @@ async function saveDeal(){
     if(error){document.getElementById('serr').textContent=error.message;if(btn){btn.textContent='Charge & save deal';btn.disabled=false;}return;}
     const h=Math.round(fee/2*100),sa=Math.round(dMrr*100);
     const ca=dCC==='deposit'?h:dCC==='sub'?sa:h+sa;
+    if(ca<=0){document.getElementById('serr').textContent='Amount is $0 — enter a one-time fee amount above';if(btn){btn.textContent='Charge & save deal';btn.disabled=false;}return;}
     const res=await api('charge',{token:paymentMethod.id,amount:ca,desc:`ZING — ${cn} ${dPlan}`});
     if(res&&res.ok){deal.s3a=ca/100;deal.s3r=res.cid;document.getElementById('psuc').classList.add('show');document.getElementById('pref').textContent=`Stripe ref: ${res.cid}`;}
-    else document.getElementById('serr').textContent=res?.err||'Payment failed';
+    else{document.getElementById('serr').textContent='Payment failed: '+(res?.err||'Unknown error — check Stripe dashboard');if(btn){btn.textContent='Charge & save deal';btn.disabled=false;}return;}
   }else if(dPA==='inv'){
     const ie=document.getElementById('inv-to')?.value;
     if(ie){const ir=await api('stripeInv',{cn,ce:ie,desc:`${dPlan} — ${deal.fd}`,amount:Math.round(fee/2*100),due:document.getElementById('inv-due')?.value});if(ir?.id){deal.sInvId=ir.id;toast('Invoice sent via Stripe');}}

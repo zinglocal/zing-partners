@@ -1,324 +1,272 @@
-// ============================================================
-// ZING Partner Manager — Google Apps Script Backend
-// ServiceQUIK Inc. / zinglocal.github.io/zing-partners
-// ============================================================
-// ⚠️  PASTE YOUR STRIPE SECRET KEY HERE — use sk_test_ for testing, sk_live_ for production.
+// ═══════════════════════════════════════════════════════════════
+//  ZING Partner Manager — Google Apps Script Backend
+//  Deploy as: Web App → Execute as: Me → Access: Anyone
+// ═══════════════════════════════════════════════════════════════
+
+// ⚠️  Paste your Stripe Secret Key here (sk_test_... for test, sk_live_... for production)
 // Find it at: https://dashboard.stripe.com/apikeys → "Secret key"
-const STRIPE_SK = 'sk_test_REPLACE_WITH_YOUR_KEY';
+const STRIPE_SECRET = 'sk_test_REPLACE_WITH_YOUR_KEY';
 
-// ─────────────────────────────────────────────────────────────
-// HTTP HANDLERS
-// ─────────────────────────────────────────────────────────────
-
-function doPost(e) {
-  const out = handleRequest(e);
-  return ContentService
-    .createTextOutput(JSON.stringify(out))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function doGet(e) {
-  return ContentService
-    .createTextOutput(JSON.stringify({ status: 'ok', app: 'ZING Partner Manager' }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function handleRequest(e) {
-  try {
-    const body = JSON.parse(e.postData.contents);
-    const action = body.action;
-
-    switch (action) {
-      case 'init':                   return initSheets();
-      case 'getAll':                 return getAll();
-      case 'saveSrc':                return saveSrc(body.src);
-      case 'delSrc':                 return delRecord('LeadSources', body.id);
-      case 'saveDeal':               return saveDeal(body.deal);
-      case 'delDeal':                return delRecord('Deals', body.id);
-      case 'saveInv':                return saveInv(body.inv);
-      case 'charge':
-      case 'createPaymentIntent':    return createPaymentIntent(body.amount, body.currency || 'usd', body.desc || body.description || '');
-      case 'stripeInv':              return sendStripeInvoice(body);
-      default:                       return { error: 'Unknown action: ' + action };
-    }
-  } catch (err) {
-    return { error: err.message };
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-// SHEET HELPERS
-// Storage: each record is one row — col A = id, col B = full JSON
-// ─────────────────────────────────────────────────────────────
+// ── SHEET NAMES ────────────────────────────────────────────────
+const SHEETS = { sources: 'LeadSources', deals: 'Deals', invoices: 'Invoices', meta: 'Meta' };
 
 function getSheet(name) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  return ss.getSheetByName(name) || ss.insertSheet(name);
+  let sh = ss.getSheetByName(name);
+  if (!sh) sh = ss.insertSheet(name);
+  return sh;
 }
 
 function initSheets() {
-  ['LeadSources', 'Deals', 'Invoices', 'Meta'].forEach(n => getSheet(n));
-  const meta = getSheet('Meta');
-  if (meta.getLastRow() === 0) {
-    meta.appendRow(['ns', 1]);
-    meta.appendRow(['nd', 1]);
-    meta.appendRow(['ni', 1]);
-  }
-  return { ok: true };
-}
-
-function getMeta(key) {
-  const meta = getSheet('Meta');
-  if (meta.getLastRow() === 0) return null;
-  const data = meta.getDataRange().getValues();
-  for (const row of data) {
-    if (row[0] === key) return row[1];
-  }
-  return null;
-}
-
-function setMeta(key, value) {
-  const meta = getSheet('Meta');
-  if (meta.getLastRow() > 0) {
-    const data = meta.getDataRange().getValues();
-    for (let i = 0; i < data.length; i++) {
-      if (data[i][0] === key) {
-        meta.getRange(i + 1, 2).setValue(value);
-        return;
-      }
+  const headers = {
+    LeadSources: ['id','name','contact','email','phone','addr','ein','type','inc','trig','terms','bank','an','rn','pm','status','pr','notes','created'],
+    Deals:       ['id','customer','email','phone','loc','plan','mrr','commission','srcId','srcName','rep','date','otf','fd','ft','notes','stage','s1d','s2d','s2u','s2b','s3d','s3a','s3r','s4d','s4a','s4m','s4r','s4ab','sInvId','created'],
+    Invoices:    ['id','cn','ce','ca','id2','dd','terms','notes','lines','tot','st','pd','pr2','stripeId','created'],
+    Meta:        ['key','value']
+  };
+  for (const [name, cols] of Object.entries(headers)) {
+    const sh = getSheet(name);
+    if (sh.getLastRow() === 0) {
+      sh.appendRow(cols);
+      sh.getRange(1, 1, 1, cols.length).setFontWeight('bold').setBackground('#050536').setFontColor('#ffffff');
+      sh.setFrozenRows(1);
     }
   }
-  meta.appendRow([key, value]);
+  const meta = getSheet('Meta');
+  const vals = meta.getDataRange().getValues();
+  const keys = vals.map(r => r[0]);
+  if (!keys.includes('nd')) meta.appendRow(['nd', 0]);
+  if (!keys.includes('ni')) meta.appendRow(['ni', 0]);
+  if (!keys.includes('ns')) meta.appendRow(['ns', 0]);
 }
 
-function getAllRecords(sheetName) {
-  const sheet = getSheet(sheetName);
-  if (sheet.getLastRow() === 0) return [];
-  const data = sheet.getDataRange().getValues();
-  const records = [];
-  for (const row of data) {
-    try {
-      if (row[1]) records.push(JSON.parse(row[1]));
-    } catch (e) {}
-  }
-  return records;
-}
-
-function saveRecord(sheetName, id, obj) {
-  const sheet = getSheet(sheetName);
-  const json = JSON.stringify(obj);
-  if (sheet.getLastRow() > 0) {
-    const ids = sheet.getRange(1, 1, sheet.getLastRow(), 1).getValues().flat();
-    const idx = ids.indexOf(id);
-    if (idx >= 0) {
-      sheet.getRange(idx + 1, 1, 1, 2).setValues([[id, json]]);
-      return;
-    }
-  }
-  sheet.appendRow([id, json]);
-}
-
-function delRecord(sheetName, id) {
-  const sheet = getSheet(sheetName);
-  if (sheet.getLastRow() === 0) return { ok: true };
-  const ids = sheet.getRange(1, 1, sheet.getLastRow(), 1).getValues().flat();
-  const idx = ids.indexOf(id);
-  if (idx >= 0) sheet.deleteRow(idx + 1);
-  return { ok: true };
-}
-
-// ─────────────────────────────────────────────────────────────
-// DATA OPERATIONS
-// ─────────────────────────────────────────────────────────────
-
-function getAll() {
-  const sources  = getAllRecords('LeadSources');
-  const deals    = getAllRecords('Deals');
-  const invoices = getAllRecords('Invoices');
-  const ns = getMeta('ns') || 1;
-  const nd = getMeta('nd') || 1;
-  const ni = getMeta('ni') || 1;
-  return { sources, deals, invoices, ns, nd, ni };
-}
-
-function saveSrc(src) {
-  if (!src || !src.id) return { error: 'Missing source data' };
-  saveRecord('LeadSources', src.id, src);
-  return { ok: true };
-}
-
-function saveDeal(deal) {
-  if (!deal || !deal.id) return { error: 'Missing deal data' };
-  saveRecord('Deals', deal.id, deal);
-  return { ok: true };
-}
-
-function saveInv(inv) {
-  if (!inv || !inv.id) return { error: 'Missing invoice data' };
-  saveRecord('Invoices', inv.id, inv);
-  return { ok: true };
-}
-
-// ─────────────────────────────────────────────────────────────
-// STRIPE — PAYMENT INTENT
-// Called by frontend as action='charge' with amount in cents
-// ─────────────────────────────────────────────────────────────
-
-function createPaymentIntent(amount, currency, description) {
+// ── HTTP HANDLER ───────────────────────────────────────────────
+function doPost(e) {
   try {
-    if (!amount || amount <= 0) {
-      return { success: false, error: 'Invalid amount: must be > 0 cents' };
-    }
+    const body = JSON.parse(e.postData.contents);
+    const action = body.action;
+    let result = { ok: false };
 
-    const payload = [
-      'amount='      + Math.round(amount),
-      'currency='    + (currency || 'usd'),
-      'description=' + encodeURIComponent(description || 'ZING payment'),
-      // allow_redirects=off means no redirect-based payment methods (cards only)
-      'automatic_payment_methods[enabled]=true',
-      'automatic_payment_methods[allow_redirects]=off'
-    ].join('&');
+    if      (action === 'init')     result = handleInit();
+    else if (action === 'getAll')   result = handleGetAll();
+    else if (action === 'saveSrc')  result = handleSaveSrc(body.src);
+    else if (action === 'delSrc')   result = handleDelSrc(body.id);
+    else if (action === 'saveDeal') result = handleSaveDeal(body.deal);
+    else if (action === 'delDeal')  result = handleDelDeal(body.id);
+    else if (action === 'saveInv')  result = handleSaveInv(body.inv);
+    else if (action === 'charge')   result = handleCharge(body);
+    else if (action === 'stripeInv') result = handleStripeInv(body);
+    else result = { ok: false, err: 'Unknown action: ' + action };
 
-    const response = UrlFetchApp.fetch('https://api.stripe.com/v1/payment_intents', {
-      method: 'post',
-      headers: {
-        'Authorization': 'Bearer ' + STRIPE_SK,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      payload: payload,
-      muteHttpExceptions: true
-    });
-
-    const data = JSON.parse(response.getContentText());
-
-    if (data.error) {
-      return { success: false, error: data.error.message };
-    }
-
-    // Frontend expects { clientSecret: '...' }
-    return { success: true, clientSecret: data.client_secret };
-
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
-    return { success: false, error: err.message };
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, err: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// STRIPE — INVOICE
-// ─────────────────────────────────────────────────────────────
-
-function sendStripeInvoice(params) {
-  try {
-    const { cn, ce, lines, desc, amount, due, notes } = params;
-
-    if (!ce) return { ok: false, error: 'Customer email required' };
-
-    // 1. Find or create Stripe customer
-    const customerId = findOrCreateStripeCustomer(cn, ce);
-
-    // 2. Compute due date as Unix timestamp
-    const dueTs = due
-      ? Math.floor(new Date(due).getTime() / 1000)
-      : Math.floor(Date.now() / 1000) + 14 * 86400;
-
-    // 3. Create invoice shell
-    const invPayload = [
-      'customer='          + customerId,
-      'collection_method=send_invoice',
-      'due_date='          + dueTs,
-      notes ? 'description=' + encodeURIComponent(notes) : ''
-    ].filter(Boolean).join('&');
-
-    const invResponse = UrlFetchApp.fetch('https://api.stripe.com/v1/invoices', {
-      method: 'post',
-      headers: {
-        'Authorization': 'Bearer ' + STRIPE_SK,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      payload: invPayload,
-      muteHttpExceptions: true
-    });
-    const inv = JSON.parse(invResponse.getContentText());
-    if (inv.error) return { ok: false, error: inv.error.message };
-
-    // 4. Add line items (lines array from frontend, or single amount)
-    const items = lines && lines.length
-      ? lines
-      : [{ d: desc || 'ZING service', q: 1, a: (amount || 0) / 100 }];
-
-    for (const item of items) {
-      const cents = Math.round((parseFloat(item.a) || 0) * (parseInt(item.q) || 1) * 100);
-      if (cents <= 0) continue;
-      UrlFetchApp.fetch('https://api.stripe.com/v1/invoiceitems', {
-        method: 'post',
-        headers: {
-          'Authorization': 'Bearer ' + STRIPE_SK,
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        payload: [
-          'customer=' + customerId,
-          'invoice='  + inv.id,
-          'amount='   + cents,
-          'currency=usd',
-          'description=' + encodeURIComponent(item.d || 'Service')
-        ].join('&'),
-        muteHttpExceptions: true
-      });
-    }
-
-    // 5. Finalize invoice
-    UrlFetchApp.fetch('https://api.stripe.com/v1/invoices/' + inv.id + '/finalize', {
-      method: 'post',
-      headers: { 'Authorization': 'Bearer ' + STRIPE_SK, 'Content-Type': 'application/x-www-form-urlencoded' },
-      payload: '',
-      muteHttpExceptions: true
-    });
-
-    // 6. Send invoice email via Stripe
-    UrlFetchApp.fetch('https://api.stripe.com/v1/invoices/' + inv.id + '/send', {
-      method: 'post',
-      headers: { 'Authorization': 'Bearer ' + STRIPE_SK, 'Content-Type': 'application/x-www-form-urlencoded' },
-      payload: '',
-      muteHttpExceptions: true
-    });
-
-    return { ok: true, id: inv.id };
-
-  } catch (err) {
-    return { ok: false, error: err.message };
-  }
+function doGet() {
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'ZING Partner Manager' }))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
-function findOrCreateStripeCustomer(name, email) {
-  // Search for existing customer by email
-  const searchRes = UrlFetchApp.fetch(
-    'https://api.stripe.com/v1/customers/search?query=' + encodeURIComponent('email:"' + email + '"'),
-    {
-      headers: { 'Authorization': 'Bearer ' + STRIPE_SK },
-      muteHttpExceptions: true
-    }
-  );
-  const searchData = JSON.parse(searchRes.getContentText());
-  if (searchData.data && searchData.data.length > 0) {
-    return searchData.data[0].id;
+// ── INIT ───────────────────────────────────────────────────────
+function handleInit() { initSheets(); return { ok: true }; }
+
+// ── GET ALL ────────────────────────────────────────────────────
+function handleGetAll() {
+  initSheets();
+  const sources  = sheetToObjects('LeadSources').map(s => ({ ...s, pr: tryParse(s.pr) }));
+  const deals    = sheetToObjects('Deals').map(d => ({
+    ...d, mrr: +d.mrr||0, commission: +d.commission||0, stage: +d.stage||1,
+    otf: +d.otf||0, s3a: +d.s3a||0, s4a: +d.s4a||0
+  }));
+  const invoices = sheetToObjects('Invoices').map(i => ({ ...i, tot: +i.tot||0, lines: tryParse(i.lines) }));
+  const meta     = getSheet('Meta').getDataRange().getValues();
+  const nd       = +((meta.find(r => r[0]==='nd')||[])[1]||0);
+  const ni       = +((meta.find(r => r[0]==='ni')||[])[1]||0);
+  const ns       = +((meta.find(r => r[0]==='ns')||[])[1]||0);
+  return { ok: true, sources, deals, invoices, nd, ni, ns };
+}
+
+// ── LEAD SOURCES ───────────────────────────────────────────────
+function handleSaveSrc(src) {
+  if (!src || !src.id) return { ok: false, err: 'No source data' };
+  const sh = getSheet('LeadSources');
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const rows = sh.getDataRange().getValues();
+  const existingRow = rows.findIndex((r, i) => i > 0 && r[0] === src.id);
+  const toSave = { ...src, pr: JSON.stringify(src.pr || []) };
+  const row = headers.map(h => toSave[h] !== undefined ? toSave[h] : '');
+  if (existingRow > 0) {
+    sh.getRange(existingRow + 1, 1, 1, row.length).setValues([row]);
+  } else {
+    sh.appendRow(row);
+    bumpMeta('ns');
+  }
+  return { ok: true };
+}
+
+function handleDelSrc(id) { return deleteRowById('LeadSources', id); }
+
+// ── DEALS ──────────────────────────────────────────────────────
+function handleSaveDeal(deal) {
+  if (!deal || !deal.id) return { ok: false, err: 'No deal data' };
+  const sh = getSheet('Deals');
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const rows = sh.getDataRange().getValues();
+  const existingRow = rows.findIndex((r, i) => i > 0 && r[0] === deal.id);
+  const row = headers.map(h => deal[h] !== undefined ? deal[h] : '');
+  if (existingRow > 0) {
+    sh.getRange(existingRow + 1, 1, 1, row.length).setValues([row]);
+  } else {
+    sh.appendRow(row);
+    bumpMeta('nd');
+  }
+  return { ok: true };
+}
+
+function handleDelDeal(id) { return deleteRowById('Deals', id); }
+
+// ── INVOICES ───────────────────────────────────────────────────
+function handleSaveInv(inv) {
+  if (!inv || !inv.id) return { ok: false, err: 'No invoice data' };
+  const sh = getSheet('Invoices');
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const rows = sh.getDataRange().getValues();
+  const existingRow = rows.findIndex((r, i) => i > 0 && r[0] === inv.id);
+  const toSave = { ...inv, lines: JSON.stringify(inv.lines || []) };
+  const row = headers.map(h => toSave[h] !== undefined ? toSave[h] : '');
+  if (existingRow > 0) {
+    sh.getRange(existingRow + 1, 1, 1, row.length).setValues([row]);
+  } else {
+    sh.appendRow(row);
+    bumpMeta('ni');
+  }
+  return { ok: true };
+}
+
+// ── STRIPE: CREATE PAYMENT INTENT ─────────────────────────────
+function handleCharge(body) {
+  const { amount, desc } = body;
+  if (!amount) return { ok: false, err: 'Missing amount' };
+  const res = stripePost('https://api.stripe.com/v1/payment_intents', {
+    amount: String(Math.round(amount)),
+    currency: 'usd',
+    'payment_method_types[]': 'card',
+    description: desc || 'ZING payment'
+  });
+  Logger.log('PaymentIntent response: ' + JSON.stringify(res));
+  if (res.client_secret) {
+    return { ok: true, clientSecret: res.client_secret, id: res.id };
+  }
+  return { ok: false, err: res.error?.message || JSON.stringify(res).substring(0, 300) };
+}
+
+// ── STRIPE: SEND INVOICE ───────────────────────────────────────
+function handleStripeInv(body) {
+  const { cn, ce, lines, due, notes } = body;
+  if (!cn || !ce) return { ok: false, err: 'Missing client name or email' };
+
+  let custId = findStripeCustomer(ce);
+  if (!custId) {
+    const cust = stripePost('https://api.stripe.com/v1/customers', { name: cn, email: ce });
+    if (!cust.id) return { ok: false, err: 'Could not create Stripe customer' };
+    custId = cust.id;
   }
 
-  // Create new customer
-  const createPayload = [
-    'email=' + encodeURIComponent(email),
-    name ? 'name=' + encodeURIComponent(name) : ''
-  ].filter(Boolean).join('&');
+  const dueTs = due ? Math.floor(new Date(due).getTime() / 1000) : Math.floor(Date.now() / 1000) + 14 * 86400;
+  const inv = stripePost('https://api.stripe.com/v1/invoices', {
+    customer: custId,
+    collection_method: 'send_invoice',
+    due_date: String(dueTs),
+    description: notes || ''
+  });
+  if (!inv.id) return { ok: false, err: 'Could not create Stripe invoice' };
 
-  const createRes = UrlFetchApp.fetch('https://api.stripe.com/v1/customers', {
+  for (const line of (lines || [])) {
+    if (!line.d || !line.a) continue;
+    stripePost('https://api.stripe.com/v1/invoiceitems', {
+      customer: custId,
+      invoice: inv.id,
+      description: line.d,
+      quantity: String(line.q || 1),
+      unit_amount: String(Math.round((line.a || 0) * 100)),
+      currency: 'usd'
+    });
+  }
+
+  stripePost('https://api.stripe.com/v1/invoices/' + inv.id + '/finalize', {});
+  stripePost('https://api.stripe.com/v1/invoices/' + inv.id + '/send', {});
+  return { ok: true, id: inv.id };
+}
+
+// ── STRIPE HELPERS ─────────────────────────────────────────────
+function stripePost(url, params) {
+  const body = Object.entries(params)
+    .map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v))
+    .join('&');
+  const res = UrlFetchApp.fetch(url, {
     method: 'post',
-    headers: {
-      'Authorization': 'Bearer ' + STRIPE_SK,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    payload: createPayload,
+    headers: { Authorization: 'Bearer ' + STRIPE_SECRET },
+    payload: body,
     muteHttpExceptions: true
   });
-  const customer = JSON.parse(createRes.getContentText());
-  if (customer.error) throw new Error('Could not create Stripe customer: ' + customer.error.message);
-  return customer.id;
+  return JSON.parse(res.getContentText());
+}
+
+function findStripeCustomer(email) {
+  const res = UrlFetchApp.fetch(
+    "https://api.stripe.com/v1/customers/search?query=email:'" + email + "'&limit=1",
+    { headers: { Authorization: 'Bearer ' + STRIPE_SECRET }, muteHttpExceptions: true }
+  );
+  const data = JSON.parse(res.getContentText());
+  return data.data?.[0]?.id || null;
+}
+
+// ── SHEET UTILITIES ────────────────────────────────────────────
+function sheetToObjects(sheetName) {
+  const sh = getSheet(sheetName);
+  if (sh.getLastRow() < 2) return [];
+  const rows = sh.getDataRange().getValues();
+  const headers = rows[0];
+  return rows.slice(1).filter(r => r[0]).map(r => {
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = r[i]; });
+    return obj;
+  });
+}
+
+function deleteRowById(sheetName, id) {
+  const sh = getSheet(sheetName);
+  const rows = sh.getDataRange().getValues();
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (rows[i][0] === id) { sh.deleteRow(i + 1); return { ok: true }; }
+  }
+  return { ok: false, err: 'Row not found' };
+}
+
+function bumpMeta(key) {
+  const sh = getSheet('Meta');
+  const rows = sh.getDataRange().getValues();
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i][0] === key) { sh.getRange(i + 1, 2).setValue((+rows[i][1] || 0) + 1); return; }
+  }
+  sh.appendRow([key, 1]);
+}
+
+function tryParse(val) {
+  try { return typeof val === 'string' && val ? JSON.parse(val) : (val || []); }
+  catch { return val || []; }
+}
+
+// ── TEST FUNCTION — run this directly in the editor ───────────
+function testStripe() {
+  const res = stripePost('https://api.stripe.com/v1/payment_intents', {
+    amount: '100',
+    currency: 'usd',
+    'payment_method_types[]': 'card'
+  });
+  Logger.log('Stripe test result: ' + JSON.stringify(res));
 }

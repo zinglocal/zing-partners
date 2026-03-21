@@ -618,7 +618,7 @@ function advDeal(id){
   const d=db.deals.find(x=>x.id===id);const nx=d.stage+1;
   let ex='';
   if(nx===2)ex=`<div class="fs" style="margin-top:14px">Confirm stage 2 — site published</div><div class="r2"><div class="fg"><label>Published URL *</label><input id="af-u" placeholder="clientsite.com"></div><div class="fg"><label>Published by</label><input id="af-b" placeholder="Design Team"></div></div>`;
-  else if(nx===3)ex=`<div class="fs" style="margin-top:14px">Confirm stage 3 — fee collected</div><div class="r2"><div class="fg"><label>Amount</label><div class="pfx"><span>$</span><input id="af-a" type="number" value="${d.otf||259}"></div></div><div class="fg"><label>Stripe reference *</label><input id="af-s" placeholder="ch_xxxxxxxxxx"></div></div>`;
+  else if(nx===3)ex=`<div class="fs" style="margin-top:14px">Confirm stage 3 — fee collected</div><div class="r2"><div class="fg"><label>Amount</label><div class="pfx"><span>$</span><input id="af-a" type="number" value="${d.otf||259}"></div></div><div class="fg"><label>Stripe reference *</label><input id="af-s" value="${d.s3r||''}" placeholder="ch_xxxxxxxxxx"></div></div>`;
   else if(nx===4)ex=`<div class="fs" style="margin-top:14px">Confirm stage 4 — partner paid</div><div class="r2"><div class="fg"><label>Amount paid</label><div class="pfx"><span>$</span><input id="af-p" type="number" value="${d.commission}"></div></div><div class="fg"><label>Method</label><select id="af-m"><option>ACH</option><option>Wire Transfer</option><option>Check</option></select></div></div><div class="r2"><div class="fg"><label>Payment reference *</label><input id="af-r" placeholder="TXN-XXXXXXXXX"></div><div class="fg"><label>Approved by</label><input id="af-ab" value="${usr||'Amy Bourke'}"></div></div>`;
   const mb=document.getElementById('mbody');
   mb.innerHTML=mb.innerHTML.replace(/<div class="mf">[\s\S]*$/,'')+ex+`<div class="mf"><button class="btn" onclick="openDeal('${id}')">Back</button><button class="btn btn-p" onclick="confAdv('${id}',${nx})">Confirm stage ${nx}</button></div>`;
@@ -690,7 +690,7 @@ function dSFT(t){dFT=t;document.querySelectorAll('.ftab').forEach(x=>x.classList
 function dFC(){const f=parseFloat(document.getElementById('df-f')?.value)||0;if(f>0){const h=(f/2).toFixed(2);['df-dep','df-bal'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=h;});const fl=document.getElementById('df-ful');if(fl)fl.value=f.toFixed(2);}dUCB();}
 function dUC(){const sid=document.getElementById('df-s')?.value;const src=db.sources.find(s=>s.id===sid);if(!src)return;document.getElementById('df-i').value=src.inc||'';if(!dMrr)return;const c=src.pr?src.pr.reduce((t,r)=>t+(r.t==='mrr'?dMrr*(parseInt(r.q)||1):(parseFloat(r.a)||0)*(parseInt(r.q)||1)),0):dMrr*2;document.getElementById('df-cv').textContent=f$(c);document.getElementById('df-cc').textContent=src.inc||'Based on payout rules';dUCB();}
 function dUCB(){const f=parseFloat(document.getElementById('df-f')?.value)||0;const h=f/2;const bd=document.getElementById('d-cb');if(!bd)return;let lines=[],tot=0;if(dCC==='deposit'||dCC==='both'){lines.push(['Launch fee deposit',h]);tot+=h;}if(dCC==='sub'||dCC==='both'){lines.push([`${dPlan||'Plan'} subscription`,dMrr]);tot+=dMrr;}bd.innerHTML=lines.map(([k,v])=>`<div class="cbr"><span>${k}</span><span class="cbv">${f$(v)}</span></div>`).join('')+`<div class="cbt"><span>Charging now</span><span class="cbtv">${f$(tot)}</span></div>`;}
-function dSPA(t){dPA=t;document.querySelectorAll('.pab').forEach(b=>b.classList.remove('on'));['pi-inv','pi-card'].forEach(id=>{const el=document.getElementById(id);if(el){el.style.background='';el.style.color='';}});document.getElementById('pa-'+t).classList.add('on');document.getElementById('pi-'+t).style.background='var(--pu)';document.getElementById('pi-'+t).style.color='#fff';document.querySelectorAll('.ppan').forEach(p=>p.classList.remove('show'));document.getElementById('pp-'+t).classList.add('show');if(t==='card')initSE();const sb=document.getElementById('dsave');if(sb)sb.textContent=t==='card'?'Charge & save deal':'Send invoice & save deal';}
+function dSPA(t){dPA=t;document.querySelectorAll('.pab').forEach(b=>b.classList.remove('on'));['pi-inv','pi-card'].forEach(id=>{const el=document.getElementById(id);if(el){el.style.background='';el.style.color='';}});document.getElementById('pa-'+t).classList.add('on');document.getElementById('pi-'+t).style.background='var(--pu)';document.getElementById('pi-'+t).style.color='#fff';document.querySelectorAll('.ppan').forEach(p=>p.classList.remove('show'));document.getElementById('pp-'+t).classList.add('show');if(t==='inv'){const ce=document.getElementById('df-ce')?.value;const invTo=document.getElementById('inv-to');if(invTo&&ce&&!invTo.value)invTo.value=ce;}if(t==='card')initSE();const sb=document.getElementById('dsave');if(sb)sb.textContent=t==='card'?'Charge & save deal':'Send invoice & save deal';}
 function togCT(el){el.closest('.ctog').querySelectorAll('.ct2').forEach(c=>c.classList.remove('on'));el.classList.add('on');}
 function dSCC(t){dCC=t;document.querySelectorAll('#pp-card .ct2').forEach(c=>c.classList.remove('on'));document.getElementById('ct-'+t).classList.add('on');dUCB();}
 function initSE(){if(!stripe){document.getElementById('serr').textContent='Stripe not configured — paste your publishable key (pk_live_... or pk_test_...) in Settings';return;}
@@ -721,7 +721,16 @@ async function saveDeal(){
     else{document.getElementById('serr').textContent='Payment failed: status '+paymentIntent?.status;if(btn){btn.textContent='Charge & save deal';btn.disabled=false;}return;}
   }else if(dPA==='inv'){
     const ie=document.getElementById('inv-to')?.value;
-    if(ie){const ir=await api('stripeInv',{cn,ce:ie,desc:`${dPlan} — ${deal.fd}`,amount:Math.round(fee/2*100),due:document.getElementById('inv-due')?.value});if(ir?.id){deal.sInvId=ir.id;toast('Invoice sent via Stripe');}}
+    if(ie){
+      const selOpt=document.querySelector('#pp-inv .ct2.on')?.textContent?.trim()||'Deposit only';
+      let lines;
+      if(selOpt==='Full fee')lines=[{d:deal.fd,q:1,a:fee}];
+      else if(selOpt==='Sub + deposit')lines=[{d:dPlan+' subscription',q:1,a:dMrr},{d:deal.fd+' (50% deposit)',q:1,a:fee/2}];
+      else if(selOpt==='Everything')lines=[{d:dPlan+' subscription',q:1,a:dMrr},{d:deal.fd,q:1,a:fee}];
+      else lines=[{d:deal.fd+' (50% deposit)',q:1,a:fee/2}];
+      const ir=await api('stripeInv',{cn,ce:ie,lines,due:document.getElementById('inv-due')?.value});
+      if(ir?.id){deal.sInvId=ir.id;toast('Invoice sent via Stripe');}
+    }
   }
   db.deals.push(deal);dPlan=null;dMrr=0;dFT='split';dPA=null;cardEl=null;
   api('saveDeal',{deal});sL();cM();render();toast(`Deal logged — ${cn}`);
@@ -763,13 +772,13 @@ async function sendIStripe(){
   const inv={id:document.getElementById('ic-id')?.value,cn:n,ce:e,ca:document.getElementById('ic-a')?.value||'',id2:document.getElementById('ic-i2')?.value,dd:document.getElementById('ic-dd')?.value,terms:document.getElementById('ic-t')?.value,notes:document.getElementById('ic-nt')?.value,lines,tot,st:'Sending...'};
   const res=await api('stripeInv',{cn:n,ce:e,lines,due:inv.dd,notes:inv.notes});
   inv.st=res?.ok?'Sent':'Draft';inv.stripeId=res?.id||'';
-  db.invoices.push(inv);db.ni++;api('saveInv',{inv});sL();cM();render();toast(res?.ok?'Invoice sent via Stripe':'Saved as draft');
+  db.invoices.push(inv);api('saveInv',{inv});sL();cM();render();toast(res?.ok?'Invoice sent via Stripe':'Saved as draft');
 }
 function saveIDraft(){
   const n=document.getElementById('ic-n')?.value.trim();if(!n){alert('Client name required');return;}
   const lines=getIL();
   const inv={id:document.getElementById('ic-id')?.value,cn:n,ce:document.getElementById('ic-e')?.value||'',id2:document.getElementById('ic-i2')?.value,dd:document.getElementById('ic-dd')?.value,lines,tot:lines.reduce((s,l)=>s+l.q*l.a,0),st:'Draft'};
-  db.invoices.push(inv);db.ni++;api('saveInv',{inv});sL();cM();render();toast('Invoice saved as draft');
+  db.invoices.push(inv);api('saveInv',{inv});sL();cM();render();toast('Invoice saved as draft');
 }
 function openInv(id){
   const inv=db.invoices.find(x=>x.id===id);if(!inv)return;

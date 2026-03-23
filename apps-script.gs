@@ -5,7 +5,7 @@
 
 // ⚠️  Paste your Stripe Secret Key here (sk_test_... for test, sk_live_... for production)
 // Find it at: https://dashboard.stripe.com/apikeys → "Secret key"
-const STRIPE_SECRET = 'sk_test_REPLACE_WITH_YOUR_KEY';
+const STRIPE_SECRET = 'sk_live_REPLACE_WITH_YOUR_KEY'; // ← paste your live key here before deploying
 
 // ── SHEET NAMES ────────────────────────────────────────────────
 const SHEETS = { sources: 'LeadSources', deals: 'Deals', invoices: 'Invoices', meta: 'Meta' };
@@ -54,8 +54,9 @@ function doPost(e) {
     else if (action === 'saveDeal') result = handleSaveDeal(body.deal);
     else if (action === 'delDeal')  result = handleDelDeal(body.id);
     else if (action === 'saveInv')  result = handleSaveInv(body.inv);
-    else if (action === 'charge')   result = handleCharge(body);
-    else if (action === 'stripeInv') result = handleStripeInv(body);
+    else if (action === 'charge')     result = handleCharge(body);
+    else if (action === 'subscribe')  result = handleSubscribe(body);
+    else if (action === 'stripeInv')  result = handleStripeInv(body);
     else result = { ok: false, err: 'Unknown action: ' + action };
 
     return ContentService.createTextOutput(JSON.stringify(result))
@@ -145,6 +146,64 @@ function handleSaveInv(inv) {
     bumpMeta('ni');
   }
   return { ok: true };
+}
+
+// ── STRIPE PLAN → PRICE ID MAP ────────────────────────────────
+const PRICE_IDS = {
+  'DISCOVER': 'price_1ShamzJdCDYxERimazBbXFQM',
+  'BOOST':    'price_1Sf2b9JdCDYxERimXLjtfVYq',
+  'DOMINATE': 'price_1SmiAOJdCDYxERimC2HsmRW7'
+};
+
+// ── STRIPE: CREATE SUBSCRIPTION ───────────────────────────────
+// Creates a Stripe Customer (or finds existing), optionally adds a
+// one-time deposit as an invoice item, then creates a subscription
+// with payment_behavior=default_incomplete so the first invoice's
+// PaymentIntent client_secret can be confirmed in the browser.
+function handleSubscribe(body) {
+  const { email, name, plan, depositAmount, desc } = body;
+  if (!email || !plan) return { ok: false, err: 'Missing email or plan' };
+
+  const priceId = PRICE_IDS[plan];
+  if (!priceId) return { ok: false, err: 'Unknown plan: ' + plan };
+
+  // Find or create Stripe customer
+  let custId = findStripeCustomer(email);
+  if (!custId) {
+    const cust = stripePost('https://api.stripe.com/v1/customers', { name: name || '', email: email });
+    if (!cust.id) return { ok: false, err: 'Could not create Stripe customer: ' + (cust.error?.message || '') };
+    custId = cust.id;
+  }
+
+  // Add deposit as a pending invoice item (will be included in the first subscription invoice)
+  if (depositAmount && depositAmount > 0) {
+    stripePost('https://api.stripe.com/v1/invoiceitems', {
+      customer: custId,
+      amount: String(Math.round(depositAmount)),
+      currency: 'usd',
+      description: desc || 'Website launch fee (deposit)'
+    });
+  }
+
+  // Create subscription — first payment will include any pending invoice items
+  const sub = stripePost('https://api.stripe.com/v1/subscriptions', {
+    customer: custId,
+    'items[0][price]': priceId,
+    payment_behavior: 'default_incomplete',
+    'payment_settings[save_default_payment_method]': 'on_subscription',
+    'expand[]': 'latest_invoice.payment_intent'
+  });
+
+  Logger.log('Subscription response: ' + JSON.stringify(sub).substring(0, 500));
+
+  if (!sub.id) return { ok: false, err: sub.error?.message || 'Could not create subscription' };
+
+  const clientSecret = sub.latest_invoice && sub.latest_invoice.payment_intent
+    ? sub.latest_invoice.payment_intent.client_secret
+    : null;
+  if (!clientSecret) return { ok: false, err: 'No client secret — subscription may already be active or expand failed' };
+
+  return { ok: true, clientSecret: clientSecret, subscriptionId: sub.id, customerId: custId };
 }
 
 // ── STRIPE: CREATE PAYMENT INTENT ─────────────────────────────

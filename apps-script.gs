@@ -44,6 +44,14 @@ function initSheets() {
 function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents);
+
+    // Stripe webhook events have a `type` field, not `action`
+    if (body.type && body.data && body.data.object) {
+      const result = handleStripeWebhook(body);
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     const action = body.action;
     let result = { ok: false };
 
@@ -65,6 +73,44 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({ ok: false, err: err.message }))
       .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+// ── STRIPE WEBHOOK ─────────────────────────────────────────────
+// Handles invoice.paid and invoice.payment_succeeded events from Stripe.
+// Matches by stripeId field, updates status to Paid + records payment date.
+function handleStripeWebhook(event) {
+  const type = event.type;
+  if (type !== 'invoice.paid' && type !== 'invoice.payment_succeeded') {
+    return { ok: true, skipped: true, type };
+  }
+
+  const stripeInv = event.data.object;
+  const stripeId  = stripeInv.id;
+  const paidAt    = stripeInv.status_transitions && stripeInv.status_transitions.paid_at
+                    ? new Date(stripeInv.status_transitions.paid_at * 1000).toISOString().split('T')[0]
+                    : new Date().toISOString().split('T')[0];
+
+  const sh      = getSheet('Invoices');
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const rows    = sh.getDataRange().getValues();
+
+  const stripeIdCol = headers.indexOf('stripeId');
+  const stCol       = headers.indexOf('st');
+  const pdCol       = headers.indexOf('pd');
+
+  if (stripeIdCol < 0 || stCol < 0) return { ok: false, err: 'Missing columns' };
+
+  let updated = false;
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][stripeIdCol] === stripeId) {
+      sh.getRange(i + 1, stCol + 1).setValue('Paid');
+      if (pdCol >= 0) sh.getRange(i + 1, pdCol + 1).setValue(paidAt);
+      updated = true;
+      break;
+    }
+  }
+
+  return { ok: true, updated, stripeId };
 }
 
 function doGet() {

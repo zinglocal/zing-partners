@@ -714,9 +714,9 @@ function addDeal(){
     <div class="fg"><label>City / location</label><input id="df-cl" placeholder="Denver, CO"></div></div>
     <div class="fs">Product sold</div>
     <div class="pg">
-      <div class="pc" onclick="dSP(this,'DISCOVER',0)"><div class="pn">DISCOVER</div><div class="pp" style="font-size:11px;font-weight:400;color:var(--mu)">1 unit</div><div class="pd">Starter local SEO + website</div></div>
-      <div class="pc" onclick="dSP(this,'BOOST',0)"><div class="pn">BOOST</div><div class="pp" style="font-size:11px;font-weight:400;color:var(--mu)">1 unit</div><div class="pd">Enhanced SEO + listings</div></div>
-      <div class="pc" onclick="dSP(this,'DOMINATE',0)"><div class="pn">DOMINATE</div><div class="pp" style="font-size:11px;font-weight:400;color:var(--mu)">1 unit</div><div class="pd">Full local dominance suite</div></div>
+      <div class="pc" onclick="dSP(this,'DISCOVER',59)"><div class="pn">DISCOVER</div><div class="pp">$59<span style="font-size:10px;font-weight:400">/mo</span></div><div class="pd">Starter local SEO + website</div></div>
+      <div class="pc" onclick="dSP(this,'BOOST',149)"><div class="pn">BOOST</div><div class="pp">$149<span style="font-size:10px;font-weight:400">/mo</span></div><div class="pd">Enhanced SEO + listings</div></div>
+      <div class="pc" onclick="dSP(this,'DOMINATE',249)"><div class="pn">DOMINATE</div><div class="pp">$249<span style="font-size:10px;font-weight:400">/mo</span></div><div class="pd">Full local dominance suite</div></div>
     </div>
     <div class="fs">Sale details</div>
     <div class="r2" style="margin-bottom:12px">
@@ -728,8 +728,8 @@ function addDeal(){
       <div class="fg"><label>Fee description</label><input id="df-fd" value="Website launch fee"></div>
     </div>
     <div class="r2" style="margin-bottom:12px">
-      <div class="fg"><label>Subscription $/mo <span style="font-size:10px;color:var(--mu)">(optional — charged separately via Stripe)</span></label><div class="pfx"><span>$</span><input id="df-mrr" type="number" placeholder="e.g. 149" oninput="dUC()"></div></div>
-      <div class="fg"><label style="opacity:0">.</label><div style="font-size:11px;color:var(--mu);padding-top:28px">Subscription is billed directly in Stripe — not required here</div></div>
+      <div class="fg"><label>Subscription $/mo <span style="font-size:10px;color:var(--mu)">(auto-filled from plan)</span></label><div class="pfx"><span>$</span><input id="df-mrr" type="number" placeholder="Select a plan above" oninput="dUC()"></div><a id="df-stripe-link" href="#" target="_blank" style="display:none;font-size:11px;color:var(--pu);margin-top:4px;text-decoration:none">↗ View in Stripe</a></div>
+      <div class="fg"><label style="opacity:0">.</label><div style="font-size:11px;color:var(--mu);padding-top:28px">Charged directly in Stripe — not collected here</div></div>
     </div>
     <div class="fs">Commission (auto-calculated)</div>
     <div class="cbox"><div><div class="cl">Commission owed to lead source</div><div class="cc" id="df-cc">Select lead source and product</div></div><div class="cv" id="df-cv">—</div></div>
@@ -755,7 +755,8 @@ function addDeal(){
     <div class="mf" id="df"><button class="btn" onclick="cM()">Cancel</button><button class="btn btn-p" id="dsave" onclick="saveDeal()">Save deal — stage 1</button></div>`);
 }
 
-function dSP(el,plan,mrr){document.querySelectorAll('.pc').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');dPlan=plan;dMrr=mrr;dUC();}
+const STRIPE_PRICE_LINKS={DISCOVER:'https://dashboard.stripe.com/prices/price_1ShamzJdCDYxERimazBbXFQM',BOOST:'https://dashboard.stripe.com/prices/price_1Sf2b9JdCDYxERimXLjtfVYq',DOMINATE:'https://dashboard.stripe.com/prices/price_1SmiAOJdCDYxERimC2HsmRW7'};
+function dSP(el,plan,mrr){document.querySelectorAll('.pc').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');dPlan=plan;dMrr=mrr;const mrrEl=document.getElementById('df-mrr');if(mrrEl){mrrEl.value=mrr;}const lnk=document.getElementById('df-stripe-link');if(lnk){lnk.href=STRIPE_PRICE_LINKS[plan]||'#';lnk.style.display='inline';}dUC();}
 function dFC(){dUCB();}
 function dUC(){const sid=document.getElementById('df-s')?.value;const src=db.sources.find(s=>s.id===sid);if(!src)return;document.getElementById('df-i').value=src.inc||'';const mrr=parseFloat(document.getElementById('df-mrr')?.value)||0;dMrr=mrr;const st=parseFloat(document.getElementById('df-st')?.value)||0;const base=st||mrr;const c=base>0?(src.pr?src.pr.reduce((t,r)=>t+(r.t==='mrr'?base*(parseInt(r.q)||1):(parseFloat(r.a)||0)*(parseInt(r.q)||1)),0):base*2):0;if(document.getElementById('df-cv'))document.getElementById('df-cv').textContent=c>0?f$(c):'—';if(document.getElementById('df-cc'))document.getElementById('df-cc').textContent=src.inc||'Based on payout rules';dUCB();}
 function dUCB(){const f=parseFloat(document.getElementById('df-f')?.value)||0;const mrr=parseFloat(document.getElementById('df-mrr')?.value)||0;const bd=document.getElementById('d-cb');if(!bd)return;let lines=[],tot=0;if(dCC==='deposit'||dCC==='both'){lines.push(['One-time fee',f]);tot+=f;}if(dCC==='sub'||dCC==='both'){lines.push([`${dPlan||'Plan'} subscription`,mrr]);tot+=mrr;}bd.innerHTML=lines.map(([k,v])=>`<div class="cbr"><span>${k}</span><span class="cbv">${f$(v)}</span></div>`).join('')+`<div class="cbt"><span>Charging now</span><span class="cbtv">${f$(tot)}</span></div>`;}

@@ -220,7 +220,7 @@ code{background:var(--bg);border:1px solid var(--bo);border-radius:4px;padding:1
     <div class="sb-sec">Overview</div>
     <div class="ni on" data-v="dash" onclick="nav('dash')"><svg class="nico" viewBox="0 0 14 14" fill="currentColor"><rect x="0" y="0" width="6" height="6" rx="1"/><rect x="8" y="0" width="6" height="6" rx="1"/><rect x="0" y="8" width="6" height="6" rx="1"/><rect x="8" y="8" width="6" height="6" rx="1"/></svg>Dashboard</div>
     <div class="sb-sec">Manage</div>
-    <div class="ni" data-v="src" onclick="nav('src')"><svg class="nico" viewBox="0 0 14 14" fill="currentColor"><circle cx="7" cy="5" r="3"/><path d="M1 13c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5H1z"/></svg>Lead Sources</div>
+    <div class="ni" data-v="src" onclick="nav('src')"><svg class="nico" viewBox="0 0 14 14" fill="currentColor"><circle cx="7" cy="5" r="3"/><path d="M1 13c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5H1z"/></svg>Referral Partner Set Up</div>
     <div class="ni" data-v="deals" onclick="nav('deals')"><svg class="nico" viewBox="0 0 14 14" fill="currentColor"><path d="M1 2.5h12v2H1zm0 4h9v2H1zm0 4h6v2H1z"/></svg>Deals</div>
     <div class="ni" data-v="pipe" onclick="nav('pipe')"><svg class="nico" viewBox="0 0 14 14" fill="currentColor"><rect x="0" y="5" width="2" height="7"/><rect x="4" y="3" width="2" height="9"/><rect x="8" y="6" width="2" height="6"/><rect x="12" y="1" width="2" height="11"/></svg>Pipeline</div>
     <div class="ni" data-v="pay" onclick="nav('pay')"><svg class="nico" viewBox="0 0 14 14" fill="currentColor"><rect x="0" y="3" width="14" height="9" rx="1.5"/><path d="M0 7h14M3 10h2M9 10h3"/></svg>Payments</div>
@@ -309,7 +309,7 @@ function setUsr(n){usr=n;localStorage.setItem('zing_user',n);updUsr();cM();toast
 function nav(v){
   view=v;
   document.querySelectorAll('.ni').forEach(el=>el.classList.toggle('on',el.dataset.v===v));
-  document.getElementById('pgtitle').textContent={dash:'Dashboard',src:'Lead Sources',deals:'Deals',pipe:'Pipeline',pay:'Payments',inv:'Invoices'}[v];
+  document.getElementById('pgtitle').textContent={dash:'Dashboard',src:'Referral Partner Set Up',deals:'Deals',pipe:'Pipeline',pay:'Payments',inv:'Invoices'}[v];
   render();
 }
 
@@ -397,7 +397,7 @@ function rDash(c,tr){
 }
 
 function rSrc(c,tr){
-  tr.innerHTML=`<button class="btn btn-p btn-sm" onclick="addSrc()">+ Add lead source</button><button class="btn btn-sm" onclick="xCSV('src')">↓ CSV</button>`;
+  tr.innerHTML=`<button class="btn btn-p btn-sm" onclick="addSrc()">+ Add referral partner</button><button class="btn btn-sm" onclick="xCSV('src')">↓ CSV</button>`;
   c.innerHTML=`<div class="src-grid">
     ${db.sources.map(s=>{
       const sd=db.deals.filter(d=>d.srcId===s.id);
@@ -426,13 +426,13 @@ function rSrc(c,tr){
 function rDeals(c,tr){
   tr.innerHTML=`<button class="btn btn-p btn-sm" onclick="addDeal()">+ Log deal</button><button class="btn btn-sm" onclick="xCSV('deals')">↓ CSV</button>`;
   c.innerHTML=`<div class="card"><div class="tw"><table>
-    <thead><tr><th>ID</th><th>Customer</th><th>Rep</th><th>Partner</th><th>Plan</th><th>Progress</th><th>Commission</th><th>Stage</th><th></th></tr></thead>
+    <thead><tr><th>ID</th><th>Customer</th><th>Rep</th><th>Partner</th><th>Plan</th><th>Sale Total</th><th>Commission</th><th>Stage</th><th></th></tr></thead>
     <tbody>${!db.deals.length?`<tr><td colspan="9" style="text-align:center;color:var(--fa);padding:40px">No deals yet</td></tr>`:
     db.deals.map(d=>`<tr>
       <td class="mo">${d.id}</td>
       <td><div style="font-weight:500">${d.customer}</div><div class="mo">${d.email||''}</div></td>
       <td style="font-size:12px">${d.rep||''}</td><td style="font-size:12px">${d.srcName||''}</td>
-      <td><span class="badge bp">${d.plan}</span><span style="font-size:11px;color:var(--mu);margin-left:5px">${f$(d.mrr)}/mo</span></td>
+      <td><span class="badge bp">${d.plan}</span>${d.saleTotal?`<span style="font-size:11px;color:var(--mu);margin-left:5px">${f$(d.saleTotal)}</span>`:''}</td>
       <td>${st(d.stage)}</td>
       <td style="font-weight:500;color:var(--pu);font-family:'DM Mono',monospace">${f$(d.commission)}</td>
       <td>${sb(d.stage)}</td>
@@ -572,7 +572,7 @@ function editSrc(id){cM();setTimeout(()=>{pRC=0;srcForm(id);},100);}
 function srcForm(id){
   const s=id?db.sources.find(x=>x.id===id):null;
   const v=(f,d='')=>s?(s[f]||''):d;
-  oM(s?'Edit lead source':'Add lead source',`
+  oM(s?'Edit referral partner':'Add referral partner',`
     <div class="fs" style="border-top:none;padding-top:0">Identity & contact</div>
     <div class="r2"><div class="fg"><label>Legal business name *</label><input id="sf-n" value="${v('name')}" placeholder="Acme Partners LLC"></div>
     <div class="fg"><label>Primary contact *</label><input id="sf-c" value="${v('contact')}" placeholder="Jane Smith"></div></div>
@@ -602,7 +602,7 @@ function srcForm(id){
     <div class="r2"><div class="fg"><label>Program type</label><select id="sf-ty"><option ${v('type','Referral Partner')==='Referral Partner'?'selected':''}>Referral Partner</option><option ${v('type')==='Channel Partner'?'selected':''}>Channel Partner</option><option ${v('type')==='Enterprise Reseller'?'selected':''}>Enterprise Reseller</option><option ${v('type')==='Strategic Partner'?'selected':''}>Strategic Partner</option></select></div>
     <div class="fg"><label>ZING owner</label><input id="sf-ow" value="${v('owner','Amy Bourke')}"></div></div>
     <div class="fg"><label>Notes</label><textarea id="sf-nt">${v('notes')}</textarea></div>
-    <div class="mf"><button class="btn" onclick="cM()">Cancel</button><button class="btn btn-p" onclick="saveSrc('${id||''}')">Save lead source</button></div>`);
+    <div class="mf"><button class="btn" onclick="cM()">Cancel</button><button class="btn btn-p" onclick="saveSrc('${id||''}')">Save referral partner</button></div>`);
   const ex=s&&s.pr&&s.pr.length?s.pr:[{t:'mrr',q:'2',a:''}];
   ex.forEach((r,i)=>addPR(r,i));
 }
@@ -647,7 +647,7 @@ function saveSrc(id){
 function openDeal(id){
   const d=db.deals.find(x=>x.id===id);if(!d)return;
   const stages=[
-    {l:'Deal sold',dt:d.s1d,f:[['Customer',d.customer],['Plan',`${d.plan} — ${f$(d.mrr)}/mo`],['Rep',d.rep||'—'],['Commission',f$(d.commission)],['Lead source',d.srcName]]},
+    {l:'Deal sold',dt:d.s1d,f:[['Customer',d.customer],['Plan',`${d.plan}${d.units>1?' ('+d.units+' units)':''}`],['Sale Total',d.saleTotal?f$(d.saleTotal):'—'],['Subscription',d.mrr?f$(d.mrr)+'/mo':'—'],['One-time fee',d.otf?f$(d.otf):'—'],['Rep',d.rep||'—'],['Commission',f$(d.commission)],['Lead source',d.srcName]]},
     {l:'Site published',dt:d.s2d,f:[['URL',d.s2u||'—'],['Published by',d.s2b||'—']]},
     {l:'Publishing fee collected',dt:d.s3d,f:[['Amount',d.s3a?f$(d.s3a):'—'],['Stripe ref',d.s3r||'—']]},
     {l:'Partner paid',dt:d.s4d,f:[['Amount paid',d.s4a?f$(d.s4a):'—'],['Method',d.s4m||'—'],['Reference',d.s4r||'—'],['Approved by',d.s4ab||'—']]}
@@ -712,17 +712,23 @@ function addDeal(){
     <div class="fg"><label>City / location</label><input id="df-cl" placeholder="Denver, CO"></div></div>
     <div class="fs">Product sold</div>
     <div class="pg">
-      <div class="pc" onclick="dSP(this,'DISCOVER',59)"><div class="pn">DISCOVER</div><div class="pp">$59<span style="font-size:10px;font-weight:400">/mo</span></div><div class="pd">Starter local SEO + website</div></div>
-      <div class="pc" onclick="dSP(this,'BOOST',149)"><div class="pn">BOOST</div><div class="pp">$149<span style="font-size:10px;font-weight:400">/mo</span></div><div class="pd">Enhanced SEO + listings</div></div>
-      <div class="pc" onclick="dSP(this,'DOMINATE',249)"><div class="pn">DOMINATE</div><div class="pp">$249<span style="font-size:10px;font-weight:400">/mo</span></div><div class="pd">Full local dominance suite</div></div>
+      <div class="pc" onclick="dSP(this,'DISCOVER',0)"><div class="pn">DISCOVER</div><div class="pp" style="font-size:11px;font-weight:400;color:var(--mu)">1 unit</div><div class="pd">Starter local SEO + website</div></div>
+      <div class="pc" onclick="dSP(this,'BOOST',0)"><div class="pn">BOOST</div><div class="pp" style="font-size:11px;font-weight:400;color:var(--mu)">1 unit</div><div class="pd">Enhanced SEO + listings</div></div>
+      <div class="pc" onclick="dSP(this,'DOMINATE',0)"><div class="pn">DOMINATE</div><div class="pp" style="font-size:11px;font-weight:400;color:var(--mu)">1 unit</div><div class="pd">Full local dominance suite</div></div>
     </div>
-    <div class="fs">One-time fee & payment structure</div>
-    <div class="r2" style="margin-bottom:12px"><div class="fg"><label>One-time fee</label><div class="pfx"><span>$</span><input id="df-f" type="number" placeholder="e.g. 259" oninput="dFC()"></div></div>
-    <div class="fg"><label>Fee description</label><input id="df-fd" value="Website launch fee"></div></div>
-    <div class="ftabs"><button class="ftab on" id="ft-split" onclick="dSFT('split')">50% deposit + 50% completion</button><button class="ftab" id="ft-full" onclick="dSFT('full')">100% upfront</button><button class="ftab" id="ft-custom" onclick="dSFT('custom')">Custom</button></div>
-    <div class="fp show" id="fp-split"><div class="r2"><div class="fg"><label>Deposit (50%)</label><div class="pfx"><span>$</span><input id="df-dep" readonly placeholder="Auto-calc"></div></div><div class="fg"><label>Final balance (50%)</label><div class="pfx"><span>$</span><input id="df-bal" readonly placeholder="Auto-calc"></div></div></div></div>
-    <div class="fp" id="fp-full"><div class="fg"><label>Full amount upfront</label><div class="pfx"><span>$</span><input id="df-ful" readonly placeholder="Auto-calc"></div></div><div style="font-size:11px;color:var(--mu);margin-top:4px">Requires CEO approval</div></div>
-    <div class="fp" id="fp-custom"><div class="r2"><div class="fg"><label>Deposit</label><div class="pfx"><span>$</span><input id="df-cd" type="number" placeholder="Amount"></div></div><div class="fg"><label>Final balance</label><div class="pfx"><span>$</span><input id="df-cb" type="number" placeholder="Amount"></div></div></div></div>
+    <div class="fs">Sale details</div>
+    <div class="r2" style="margin-bottom:12px">
+      <div class="fg"><label>Sale Total ($)</label><div class="pfx"><span>$</span><input id="df-st" type="number" placeholder="Total deal value" oninput="dFC()"></div></div>
+      <div class="fg"><label>Units sold</label><input id="df-units" type="number" placeholder="1" value="1" min="1"></div>
+    </div>
+    <div class="r2" style="margin-bottom:12px">
+      <div class="fg"><label>One-time fee <span style="font-size:10px;color:var(--mu)">(optional)</span></label><div class="pfx"><span>$</span><input id="df-f" type="number" placeholder="e.g. 259" oninput="dFC()"></div></div>
+      <div class="fg"><label>Fee description</label><input id="df-fd" value="Website launch fee"></div>
+    </div>
+    <div class="r2" style="margin-bottom:12px">
+      <div class="fg"><label>Subscription $/mo <span style="font-size:10px;color:var(--mu)">(optional — charged separately via Stripe)</span></label><div class="pfx"><span>$</span><input id="df-mrr" type="number" placeholder="e.g. 149" oninput="dUC()"></div></div>
+      <div class="fg"><label style="opacity:0">.</label><div style="font-size:11px;color:var(--mu);padding-top:28px">Subscription is billed directly in Stripe — not required here</div></div>
+    </div>
     <div class="fs">Commission (auto-calculated)</div>
     <div class="cbox"><div><div class="cl">Commission owed to lead source</div><div class="cc" id="df-cc">Select lead source and product</div></div><div class="cv" id="df-cv">—</div></div>
     <div class="fs">Notes</div>
@@ -747,11 +753,10 @@ function addDeal(){
     <div class="mf" id="df"><button class="btn" onclick="cM()">Cancel</button><button class="btn btn-p" id="dsave" onclick="saveDeal()">Save deal — stage 1</button></div>`);
 }
 
-function dSP(el,plan,mrr){document.querySelectorAll('.pc').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');dPlan=plan;dMrr=mrr;dUC();dFC();}
-function dSFT(t){dFT=t;document.querySelectorAll('.ftab').forEach(x=>x.classList.remove('on'));document.querySelectorAll('.fp').forEach(p=>p.classList.remove('show'));document.getElementById('ft-'+t).classList.add('on');document.getElementById('fp-'+t).classList.add('show');dFC();}
-function dFC(){const f=parseFloat(document.getElementById('df-f')?.value)||0;if(f>0){const h=(f/2).toFixed(2);['df-dep','df-bal'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=h;});const fl=document.getElementById('df-ful');if(fl)fl.value=f.toFixed(2);}dUCB();}
-function dUC(){const sid=document.getElementById('df-s')?.value;const src=db.sources.find(s=>s.id===sid);if(!src)return;document.getElementById('df-i').value=src.inc||'';if(!dMrr)return;const c=src.pr?src.pr.reduce((t,r)=>t+(r.t==='mrr'?dMrr*(parseInt(r.q)||1):(parseFloat(r.a)||0)*(parseInt(r.q)||1)),0):dMrr*2;document.getElementById('df-cv').textContent=f$(c);document.getElementById('df-cc').textContent=src.inc||'Based on payout rules';dUCB();}
-function dUCB(){const f=parseFloat(document.getElementById('df-f')?.value)||0;const h=f/2;const bd=document.getElementById('d-cb');if(!bd)return;let lines=[],tot=0;if(dCC==='deposit'||dCC==='both'){lines.push(['Launch fee deposit',h]);tot+=h;}if(dCC==='sub'||dCC==='both'){lines.push([`${dPlan||'Plan'} subscription`,dMrr]);tot+=dMrr;}bd.innerHTML=lines.map(([k,v])=>`<div class="cbr"><span>${k}</span><span class="cbv">${f$(v)}</span></div>`).join('')+`<div class="cbt"><span>Charging now</span><span class="cbtv">${f$(tot)}</span></div>`;}
+function dSP(el,plan,mrr){document.querySelectorAll('.pc').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');dPlan=plan;dMrr=mrr;dUC();}
+function dFC(){dUCB();}
+function dUC(){const sid=document.getElementById('df-s')?.value;const src=db.sources.find(s=>s.id===sid);if(!src)return;document.getElementById('df-i').value=src.inc||'';const mrr=parseFloat(document.getElementById('df-mrr')?.value)||0;dMrr=mrr;const st=parseFloat(document.getElementById('df-st')?.value)||0;const base=st||mrr;const c=base>0?(src.pr?src.pr.reduce((t,r)=>t+(r.t==='mrr'?base*(parseInt(r.q)||1):(parseFloat(r.a)||0)*(parseInt(r.q)||1)),0):base*2):0;if(document.getElementById('df-cv'))document.getElementById('df-cv').textContent=c>0?f$(c):'—';if(document.getElementById('df-cc'))document.getElementById('df-cc').textContent=src.inc||'Based on payout rules';dUCB();}
+function dUCB(){const f=parseFloat(document.getElementById('df-f')?.value)||0;const mrr=parseFloat(document.getElementById('df-mrr')?.value)||0;const bd=document.getElementById('d-cb');if(!bd)return;let lines=[],tot=0;if(dCC==='deposit'||dCC==='both'){lines.push(['One-time fee',f]);tot+=f;}if(dCC==='sub'||dCC==='both'){lines.push([`${dPlan||'Plan'} subscription`,mrr]);tot+=mrr;}bd.innerHTML=lines.map(([k,v])=>`<div class="cbr"><span>${k}</span><span class="cbv">${f$(v)}</span></div>`).join('')+`<div class="cbt"><span>Charging now</span><span class="cbtv">${f$(tot)}</span></div>`;}
 function dSPA(t){dPA=t;document.querySelectorAll('.pab').forEach(b=>b.classList.remove('on'));['pi-inv','pi-card'].forEach(id=>{const el=document.getElementById(id);if(el){el.style.background='';el.style.color='';}});document.getElementById('pa-'+t).classList.add('on');document.getElementById('pi-'+t).style.background='var(--pu)';document.getElementById('pi-'+t).style.color='#fff';document.querySelectorAll('.ppan').forEach(p=>p.classList.remove('show'));document.getElementById('pp-'+t).classList.add('show');if(t==='inv'){const ce=document.getElementById('df-ce')?.value;const invTo=document.getElementById('inv-to');if(invTo&&ce&&!invTo.value)invTo.value=ce;}if(t==='card')initSE();const sb=document.getElementById('dsave');if(sb)sb.textContent=t==='card'?'Charge & save deal':'Send invoice & save deal';}
 function togCT(el){el.closest('.ctog').querySelectorAll('.ct2').forEach(c=>c.classList.remove('on'));el.classList.add('on');}
 function dSCC(t){dCC=t;document.querySelectorAll('#pp-card .ct2').forEach(c=>c.classList.remove('on'));document.getElementById('ct-'+t).classList.add('on');dUCB();}
@@ -766,8 +771,13 @@ async function saveDeal(){
   if(!sid){alert('Select a lead source');return;}
   const src=db.sources.find(s=>s.id===sid);
   const fee=parseFloat(document.getElementById('df-f')?.value)||0;
-  const comm=src.pr?src.pr.reduce((t,r)=>t+(r.t==='mrr'?dMrr*(parseInt(r.q)||1):(parseFloat(r.a)||0)*(parseInt(r.q)||1)),0):dMrr*2;
-  const deal={id:nDid(),customer:cn,email:document.getElementById('df-ce')?.value||'',phone:document.getElementById('df-cp')?.value||'',loc:document.getElementById('df-cl')?.value||'',plan:dPlan,mrr:dMrr,commission:comm,srcId:sid,srcName:src.name,rep:document.getElementById('df-r')?.value||'',date:document.getElementById('df-dt')?.value||td(),otf:fee,fd:document.getElementById('df-fd')?.value||'Website launch fee',ft:dFT,notes:document.getElementById('df-nt')?.value||'',stage:1,s1d:td(),s2d:'',s2u:'',s2b:'',s3d:'',s3a:0,s3r:'',s4d:'',s4a:0,s4m:'',s4r:'',s4ab:'',created:td()};
+  const mrr=parseFloat(document.getElementById('df-mrr')?.value)||0;
+  const saleTotal=parseFloat(document.getElementById('df-st')?.value)||0;
+  const units=parseInt(document.getElementById('df-units')?.value)||1;
+  dMrr=mrr;
+  const base=saleTotal||mrr;
+  const comm=base>0?(src.pr?src.pr.reduce((t,r)=>t+(r.t==='mrr'?base*(parseInt(r.q)||1):(parseFloat(r.a)||0)*(parseInt(r.q)||1)),0):base*2):0;
+  const deal={id:nDid(),customer:cn,email:document.getElementById('df-ce')?.value||'',phone:document.getElementById('df-cp')?.value||'',loc:document.getElementById('df-cl')?.value||'',plan:dPlan,mrr:mrr,units:units,saleTotal:saleTotal,commission:comm,srcId:sid,srcName:src.name,rep:document.getElementById('df-r')?.value||'',date:document.getElementById('df-dt')?.value||td(),otf:fee,fd:document.getElementById('df-fd')?.value||'Website launch fee',ft:'',notes:document.getElementById('df-nt')?.value||'',stage:1,s1d:td(),s2d:'',s2u:'',s2b:'',s3d:'',s3a:0,s3r:'',s4d:'',s4a:0,s4m:'',s4r:'',s4ab:'',created:td()};
   if(dPA==='card'&&cardEl&&stripe){
     const btn=document.getElementById('dsave');if(btn){btn.textContent='Processing...';btn.disabled=true;}
     const h=Math.round(fee/2*100);

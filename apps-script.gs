@@ -20,7 +20,7 @@ function getSheet(name) {
 function initSheets() {
   const headers = {
     LeadSources: ['id','name','contact','email','phone','addr','ein','type','inc','trig','terms','bank','an','rn','pm','status','pr','notes','created'],
-    Deals:       ['id','customer','email','phone','loc','plan','mrr','commission','srcId','srcName','rep','date','otf','fd','ft','notes','stage','s1d','s2d','s2u','s2b','s3d','s3a','s3r','s4d','s4a','s4m','s4r','s4ab','sInvId','created'],
+    Deals:       ['id','customer','email','phone','loc','plan','mrr','units','saleTotal','commission','srcId','srcName','rep','date','otf','fd','ft','notes','stage','s1d','s2d','s2u','s2b','s3d','s3a','s3r','s4d','s4a','s4m','s4r','s4ab','sInvId','created'],
     Invoices:    ['id','cn','ce','ca','id2','dd','terms','notes','lines','tot','st','pd','pr2','stripeId','created'],
     Meta:        ['key','value']
   };

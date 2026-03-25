@@ -436,20 +436,35 @@ function rPay(c,tr){
   </table></div>`}</div>`;
 }
 
+let invFilter='all';
 function rInv(c,tr){
   tr.innerHTML=`<button class="btn btn-p btn-sm" onclick="newInv()">+ New invoice</button><button class="btn btn-sm" onclick="xCSV('inv')">↓ CSV</button>`;
-  c.innerHTML=`<div class="card"><div class="tw"><table>
-    <thead><tr><th>Invoice #</th><th>Client</th><th>Issued</th><th>Due</th><th>Amount</th><th>Status</th><th></th></tr></thead>
-    <tbody>${!db.invoices.length?`<tr><td colspan="7" style="text-align:center;color:var(--fa);padding:40px">No invoices yet</td></tr>`:
-    db.invoices.map(i=>`<tr>
-      <td class="mo">${i.id}</td>
-      <td><div style="font-weight:500">${i.cn}</div><div class="mo">${i.ce||''}</div></td>
-      <td class="mo">${i.id2||''}</td><td class="mo">${i.dd||''}</td>
-      <td style="font-weight:500;color:var(--pu);font-family:'DM Mono',monospace">${f$(i.tot)}</td>
-      <td><span class="badge ${i.st==='Paid'?'bg':i.st==='Sent'?'bb':'bgr'}">${i.st||'Draft'}</span></td>
-      <td><a href="#" onclick="openInv('${i.id}');return false" style="font-size:12px;color:var(--pu)">View →</a></td>
-    </tr>`).join('')}</tbody>
-  </table></div></div>`;
+  const tabs=[['all','All'],['Paid','Paid'],['Sent','Sent'],['Draft','Draft']];
+  const filtered=invFilter==='all'?db.invoices:db.invoices.filter(i=>i.st===invFilter);
+  const paidTotal=db.invoices.filter(i=>i.st==='Paid').reduce((t,i)=>t+(parseFloat(i.tot)||0),0);
+  const paidCount=db.invoices.filter(i=>i.st==='Paid').length;
+  const summaryBar=invFilter==='Paid'&&paidCount>0?`<div style="display:flex;gap:16px;margin-bottom:14px;padding:14px 16px;background:var(--pub);border-radius:var(--r);border:1px solid var(--pu)">
+    <div><div style="font-size:11px;color:var(--put);font-weight:500;text-transform:uppercase;letter-spacing:.5px">Invoices Paid</div><div style="font-size:22px;font-weight:600;color:var(--pu);font-family:'DM Mono',monospace">${paidCount}</div></div>
+    <div style="width:1px;background:var(--pu);opacity:.2"></div>
+    <div><div style="font-size:11px;color:var(--put);font-weight:500;text-transform:uppercase;letter-spacing:.5px">Total Collected</div><div style="font-size:22px;font-weight:600;color:var(--pu);font-family:'DM Mono',monospace">${f$(paidTotal)}</div></div>
+  </div>`:'';
+  c.innerHTML=`
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      ${tabs.map(([v,l])=>`<button class="ftab${invFilter===v?' on':''}" onclick="invFilter='${v}';rInv(document.getElementById('main-content'),document.getElementById('top-right'))">${l}${v!=='all'?` <span style="font-size:10px;opacity:.7">(${v==='Paid'?paidCount:db.invoices.filter(i=>i.st===v).length})</span>`:''}</button>`).join('')}
+    </div>
+    ${summaryBar}
+    <div class="card"><div class="tw"><table>
+      <thead><tr><th>Invoice #</th><th>Client</th><th>Issued</th><th>Due</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+      <tbody>${!filtered.length?`<tr><td colspan="7" style="text-align:center;color:var(--fa);padding:40px">No ${invFilter==='all'?'invoices':invFilter.toLowerCase()+' invoices'} yet</td></tr>`:
+      filtered.map(i=>`<tr>
+        <td class="mo">${i.id}</td>
+        <td><div style="font-weight:500">${i.cn}</div><div class="mo">${i.ce||''}</div></td>
+        <td class="mo">${i.id2||''}</td><td class="mo">${i.dd||''}</td>
+        <td style="font-weight:500;color:var(--pu);font-family:'DM Mono',monospace">${f$(i.tot)}</td>
+        <td><span class="badge ${i.st==='Paid'?'bg':i.st==='Sent'?'bb':'bgr'}">${i.st||'Draft'}</span></td>
+        <td><a href="#" onclick="openInv('${i.id}');return false" style="font-size:12px;color:var(--pu)">View →</a></td>
+      </tr>`).join('')}</tbody>
+    </table></div></div>`;
 }
 
 // ── SOURCE ────────────────────────────────────────────────────

@@ -5,7 +5,7 @@
 
 // ⚠️  Paste your Stripe Secret Key here (sk_test_... for test, sk_live_... for production)
 // Find it at: https://dashboard.stripe.com/apikeys → "Secret key"
-const STRIPE_SECRET = 'sk_live_REPLACE_WITH_YOUR_KEY'; // ← paste your live key here before deploying
+const STRIPE_SECRET = 'sk_live_REPLACE_WITH_YOUR_KEY'; // stored in .env — do not commit
 
 // ── SHEET NAMES ────────────────────────────────────────────────
 const SHEETS = { sources: 'LeadSources', deals: 'Deals', invoices: 'Invoices', meta: 'Meta' };
@@ -62,6 +62,7 @@ function doPost(e) {
     else if (action === 'saveDeal') result = handleSaveDeal(body.deal);
     else if (action === 'delDeal')  result = handleDelDeal(body.id);
     else if (action === 'saveInv')  result = handleSaveInv(body.inv);
+    else if (action === 'delInv')   result = deleteRowById('Invoices', body.id);
     else if (action === 'charge')     result = handleCharge(body);
     else if (action === 'subscribe')  result = handleSubscribe(body);
     else if (action === 'stripeInv')  result = handleStripeInv(body);

@@ -839,9 +839,10 @@ function openInv(id){
     </div>
     <table style="font-size:12px;margin-bottom:12px"><thead><tr><th>Description</th><th style="text-align:right">Qty</th><th style="text-align:right">Amount</th></tr></thead><tbody>${(inv.lines||[]).map(l=>`<tr><td>${l.d}</td><td style="text-align:right">${l.q}</td><td style="text-align:right;font-family:'DM Mono',monospace">${f$(l.q*l.a)}</td></tr>`).join('')}</tbody></table>
     ${inv.st!=='Paid'?`<div class="fs">Mark as paid</div><div class="r2"><div class="fg"><label>Payment date</label><input id="ipd" type="date" value="${td()}"></div><div class="fg"><label>Reference</label><input id="ipr" placeholder="TXN or Stripe ref"></div></div>`:''}
-    <div class="mf"><button class="btn" onclick="cM()">Close</button>${inv.st!=='Paid'?`<button class="btn btn-g btn-sm" onclick="markPaid('${inv.id}')">Mark as paid</button>`:''}</div>`);
+    <div class="mf"><button class="btn" onclick="cM()">Close</button><button class="btn btn-sm" style="color:#dc2626;border-color:#dc2626" onclick="delInv('${inv.id}')">Delete</button>${inv.st!=='Paid'?`<button class="btn btn-g btn-sm" onclick="markPaid('${inv.id}')">Mark as paid</button>`:''}</div>`);
 }
 function markPaid(id){const inv=db.invoices.find(x=>x.id===id);if(!inv)return;inv.st='Paid';inv.pd=document.getElementById('ipd')?.value;inv.pr2=document.getElementById('ipr')?.value;api('saveInv',{inv});sL();cM();render();toast('Invoice marked as paid');}
+function delInv(id){if(!confirm('Delete this invoice? This cannot be undone.'))return;db.invoices=db.invoices.filter(i=>i.id!==id);api('delInv',{id});sL();cM();render();toast('Invoice deleted');}
 
 // ── SETTINGS ──────────────────────────────────────────────────
 function openSettings(){

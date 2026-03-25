@@ -762,6 +762,7 @@ async function saveDeal(){
       try{
         const ir=await api('stripeInv',{cn,ce:ie,lines,due:document.getElementById('inv-due')?.value});
         if(ir?.id){deal.sInvId=ir.id;}
+        if(btn){btn.style.background='#16a34a';btn.style.opacity='1';btn.textContent='✓ Invoice sent!';}
       }catch(err){
         if(btn){btn._sending=false;btn.disabled=false;btn.style.opacity='';btn.textContent='Send invoice & save deal';}
         toast('Error sending invoice — try again');return;
@@ -812,7 +813,9 @@ async function sendIStripe(){
   try{
     const res=await api('stripeInv',{cn:n,ce:e,lines,due:inv.dd,notes:inv.notes});
     inv.st=res?.ok?'Sent':'Draft';inv.stripeId=res?.id||'';
-    db.invoices.push(inv);api('saveInv',{inv});sL();cM();render();toast(res?.ok?'Invoice sent via Stripe':'Saved as draft');
+    db.invoices.push(inv);api('saveInv',{inv});sL();
+    if(btn){btn.style.background='#16a34a';btn.style.opacity='1';btn.innerHTML='<svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor" style="margin-right:4px"><path d="M2 7l3.5 3.5L12 3"/></svg>'+(res?.ok?'Invoice sent!':'Saved as draft');}
+    setTimeout(()=>{cM();render();},1500);
   }catch(err){
     if(btn){btn._sending=false;btn.disabled=false;btn.style.opacity='';btn.innerHTML='<svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor" style="margin-right:4px"><path d="M1 1l12 6-12 6V8.5l8-1.5-8-1.5V1z"/></svg>Send via Stripe';}
     toast('Error sending invoice — try again');

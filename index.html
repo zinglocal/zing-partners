@@ -320,31 +320,78 @@ function render(){
   updCnt();
 }
 
+let dashFrom='',dashTo='';
 function rDash(c,tr){
   tr.innerHTML=`<button class="btn btn-p btn-sm" onclick="addDeal()">+ Log deal</button>`;
-  const as=db.sources.filter(s=>s.status==='Active').length;
-  const ow=db.deals.filter(d=>d.stage===3).reduce((s,d)=>s+d.commission,0);
-  const pd=db.deals.filter(d=>d.stage===4).reduce((s,d)=>s+(d.s4a||0),0);
-  const ap=db.deals.filter(d=>d.stage===3);
+
+  // Date filter helpers
+  const inRange=(dateStr)=>{
+    if(!dateStr)return true;
+    if(dashFrom&&dateStr<dashFrom)return false;
+    if(dashTo&&dateStr>dashTo)return false;
+    return true;
+  };
+
+  // Referral partner types
+  const refTypes=['Referral Partner','Channel Partner','Enterprise Reseller'];
+  const refSources=db.sources.filter(s=>!s.type||refTypes.includes(s.type));
+  const refIds=new Set(refSources.map(s=>s.id));
+
+  // Referral deals filtered by date
+  const refDeals=db.deals.filter(d=>refIds.has(d.srcId)&&inRange(d.date));
+  const refRevenue=refDeals.reduce((t,d)=>t+(d.s3a||0),0);
+  const refCommPaid=refDeals.filter(d=>d.stage===4).reduce((t,d)=>t+(d.s4a||0),0);
+  const refCommOwed=refDeals.filter(d=>d.stage===3).reduce((t,d)=>t+d.commission,0);
+
+  // Strategic partners
+  const strSources=db.sources.filter(s=>s.type==='Strategic Partner');
+
+  // Invoices filtered by date (use issue date id2 or created)
+  const filteredInv=db.invoices.filter(i=>inRange(i.id2||i.created));
+  const invPaid=filteredInv.filter(i=>i.st==='Paid');
+  const invOut=filteredInv.filter(i=>i.st==='Sent'||i.st==='Sending...');
+  const invPaidAmt=invPaid.reduce((t,i)=>t+(parseFloat(i.tot)||0),0);
+  const invOutAmt=invOut.reduce((t,i)=>t+(parseFloat(i.tot)||0),0);
+
+  // Commission owed alert
+  const ap=db.deals.filter(d=>d.stage===3&&refIds.has(d.srcId));
+
   c.innerHTML=`
-  <div class="metrics">
-    <div class="met ac"><div class="ml">Active lead sources</div><div class="mv">${as}</div><div class="ms">${db.sources.length} total</div></div>
-    <div class="met"><div class="ml">Total deals</div><div class="mv">${db.deals.length}</div><div class="ms">${db.deals.filter(d=>d.stage===4).length} complete</div></div>
-    <div class="met"><div class="ml">Commission owed</div><div class="mv" style="color:var(--am)">${f$(ow)}</div><div class="ms">${ap.length} awaiting payout</div></div>
-    <div class="met"><div class="ml">Total paid out</div><div class="mv" style="color:var(--pu)">${f$(pd)}</div><div class="ms">all time</div></div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap">
+    <span style="font-size:12px;color:var(--mu);font-weight:500">Date range</span>
+    <input type="date" value="${dashFrom}" onchange="dashFrom=this.value;rDash(document.getElementById('cnt'),document.getElementById('tr'))" style="font-size:12px;padding:5px 8px;border:1px solid var(--bm);border-radius:var(--r);background:var(--su);color:var(--ox);font-family:'DM Sans',sans-serif">
+    <span style="font-size:12px;color:var(--mu)">to</span>
+    <input type="date" value="${dashTo}" onchange="dashTo=this.value;rDash(document.getElementById('cnt'),document.getElementById('tr'))" style="font-size:12px;padding:5px 8px;border:1px solid var(--bm);border-radius:var(--r);background:var(--su);color:var(--ox);font-family:'DM Sans',sans-serif">
+    ${dashFrom||dashTo?`<button class="btn btn-sm" onclick="dashFrom='';dashTo='';rDash(document.getElementById('cnt'),document.getElementById('tr'))" style="font-size:11px">Clear</button>`:''}
+    ${dashFrom||dashTo?`<span style="font-size:11px;color:var(--mu)">(filtered)</span>`:'<span style="font-size:11px;color:var(--mu)">All time</span>'}
   </div>
-  ${ap.length?`<div class="alert alw"><div class="ald"></div><div><strong>${ap.length} commission${ap.length>1?'s':''} ready to pay</strong> — ${ap.map(d=>`<a href="#" onclick="openDeal('${d.id}');return false" style="color:var(--am)">${d.customer} (${f$(d.commission)})</a>`).join(', ')}</div></div>`:''}
+
+  <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--mu);margin-bottom:10px">Referral Partners</div>
+  <div class="metrics" style="margin-bottom:20px">
+    <div class="met"><div class="ml">Partners set up</div><div class="mv">${refSources.filter(s=>s.status==='Active').length}</div><div class="ms">${refSources.length} total</div></div>
+    <div class="met"><div class="ml">Revenue collected</div><div class="mv" style="color:var(--pu)">${f$(refRevenue)}</div><div class="ms">${refDeals.filter(d=>d.s3a>0).length} deals paid</div></div>
+    <div class="met"><div class="ml">Commission paid</div><div class="mv" style="color:var(--gr,#16a34a)">${f$(refCommPaid)}</div><div class="ms">${refDeals.filter(d=>d.stage===4).length} partners paid</div></div>
+    <div class="met"><div class="ml">Commission owed</div><div class="mv" style="color:var(--am)">${f$(refCommOwed)}</div><div class="ms">${ap.length} awaiting payout</div></div>
+  </div>
+
+  <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--mu);margin-bottom:10px">Strategic Partners</div>
+  <div class="metrics" style="grid-template-columns:repeat(2,1fr);margin-bottom:20px">
+    <div class="met"><div class="ml">Invoices outstanding</div><div class="mv" style="color:var(--am)">${f$(invOutAmt)}</div><div class="ms">${invOut.length} invoice${invOut.length!==1?'s':''}</div></div>
+    <div class="met"><div class="ml">Invoices paid</div><div class="mv" style="color:var(--gr,#16a34a)">${f$(invPaidAmt)}</div><div class="ms">${invPaid.length} invoice${invPaid.length!==1?'s':''}</div></div>
+  </div>
+
+  ${ap.length?`<div class="alert alw" style="margin-bottom:16px"><div class="ald"></div><div><strong>${ap.length} commission${ap.length>1?'s':''} ready to pay</strong> — ${ap.map(d=>`<a href="#" onclick="openDeal('${d.id}');return false" style="color:var(--am)">${d.customer} (${f$(d.commission)})</a>`).join(', ')}</div></div>`:''}
   <div class="card">
     <div class="ch"><span class="ct">Recent deals</span><button class="btn btn-sm" style="border:none;background:none;color:var(--pu)" onclick="nav('deals')">View all</button></div>
     <div class="tw"><table>
-      <thead><tr><th>Customer</th><th>Partner</th><th>Rep</th><th>Plan</th><th>Commission</th><th>Stage</th></tr></thead>
-      <tbody>${db.deals.slice(-10).reverse().map(d=>`<tr>
-        <td><div style="font-weight:500">${d.customer}</div><div class="mo">${d.email||''}</div></td>
-        <td style="font-size:12px">${d.srcName||''}</td><td style="font-size:12px">${d.rep||''}</td>
+      <thead><tr><th>Customer</th><th>Partner</th><th>Plan</th><th>Commission</th><th>Stage</th></tr></thead>
+      <tbody>${db.deals.slice(-8).reverse().map(d=>`<tr>
+        <td><div style="font-weight:500">${d.customer}</div><div class="mo">${d.date||''}</div></td>
+        <td style="font-size:12px">${d.srcName||''}</td>
         <td><span class="badge bp">${d.plan||''}</span></td>
         <td style="font-weight:500;color:var(--pu);font-family:'DM Mono',monospace">${f$(d.commission)}</td>
         <td>${sb(d.stage)}</td>
-      </tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--fa);padding:30px">No deals yet</td></tr>'}</tbody>
+      </tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--fa);padding:30px">No deals yet</td></tr>'}</tbody>
     </table></div>
   </div>`;
 }
@@ -552,7 +599,7 @@ function srcForm(id){
     <div class="fg"><label>Payment terms</label><select id="sf-trm"><option ${v('terms','Net 30')==='Net 30'?'selected':''}>Net 30</option><option ${v('terms')==='Net 14'?'selected':''}>Net 14</option><option ${v('terms')==='Net 60'?'selected':''}>Net 60</option></select></div></div>
     <div class="r2"><div class="fg"><label>Agreement ref</label><input id="sf-ar" value="${v('aref')}" placeholder="RP-2025-XXX"></div>
     <div class="fg"><label>Signed date</label><input id="sf-sd" type="date" value="${v('sd')}"></div></div>
-    <div class="r2"><div class="fg"><label>Program type</label><select id="sf-ty"><option ${v('type','Referral Partner')==='Referral Partner'?'selected':''}>Referral Partner</option><option ${v('type')==='Channel Partner'?'selected':''}>Channel Partner</option><option ${v('type')==='Enterprise Reseller'?'selected':''}>Enterprise Reseller</option></select></div>
+    <div class="r2"><div class="fg"><label>Program type</label><select id="sf-ty"><option ${v('type','Referral Partner')==='Referral Partner'?'selected':''}>Referral Partner</option><option ${v('type')==='Channel Partner'?'selected':''}>Channel Partner</option><option ${v('type')==='Enterprise Reseller'?'selected':''}>Enterprise Reseller</option><option ${v('type')==='Strategic Partner'?'selected':''}>Strategic Partner</option></select></div>
     <div class="fg"><label>ZING owner</label><input id="sf-ow" value="${v('owner','Amy Bourke')}"></div></div>
     <div class="fg"><label>Notes</label><textarea id="sf-nt">${v('notes')}</textarea></div>
     <div class="mf"><button class="btn" onclick="cM()">Cancel</button><button class="btn btn-p" onclick="saveSrc('${id||''}')">Save lead source</button></div>`);

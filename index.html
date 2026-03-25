@@ -520,7 +520,7 @@ function openSrc(id){
   const sd=db.deals.filter(d=>d.srcId===id);
   const sp=sd.filter(d=>d.stage===4).reduce((t,d)=>t+(d.s4a||0),0);
   const stt=sd.reduce((t,d)=>t+d.commission,0);
-  const ps=(s.pr||[]).map(r=>`${r.t==='mrr'?r.q+'x MRR':'$'+r.a+' flat'}`).join(' + ')||s.inc||'—';
+  const ps=(s.pr||[]).map(r=>`${r.q}x MRR`).join(' + ')||s.inc||'—';
   oM(s.name,`
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
       <div class="sav" style="width:42px;height:42px;font-size:14px">${ini(s.name)}</div>
@@ -611,10 +611,12 @@ function addPR(d={},ix=null){
   const i=ix!==null?ix:pRC;pRC=Math.max(pRC,i+1);
   const c=document.getElementById('prws');if(!c)return;
   const el=document.createElement('div');el.className='prw';el.id=`pr-${i}`;
-  el.innerHTML=`<div class="pr">
-    <select id="prt-${i}"><option value="mrr" ${d.t==='mrr'?'selected':''}>MRR (monthly recurring)</option><option value="onetime" ${d.t==='onetime'?'selected':''}>One-time payment</option></select>
-    <select id="prq-${i}">${[1,2,3,4].map(n=>`<option value="${n}" ${String(d.q)===String(n)?'selected':''}>× ${n}</option>`).join('')}</select>
-    <div class="pfx"><span>$</span><input id="pra-${i}" type="number" value="${d.a||''}" placeholder="amount"></div>
+  el.innerHTML=`<div class="pr" style="align-items:center;gap:8px">
+    <span style="font-size:13px;color:var(--mu)">Commission:</span>
+    <select id="prq-${i}" style="flex:0 0 auto;width:90px">${[1,2,3,4,5,6].map(n=>`<option value="${n}" ${String(d.q)===String(n)?'selected':''}>× ${n}</option>`).join('')}</select>
+    <span style="font-size:13px;color:var(--mu)">MRR</span>
+    <input type="hidden" id="prt-${i}" value="mrr">
+    <input type="hidden" id="pra-${i}" value="0">
   </div><button class="rm" onclick="rmPR(${i})">×</button>`;
   c.appendChild(el);
   if(pRC>=3)document.getElementById('arb').style.display='none';
@@ -632,7 +634,7 @@ function saveSrc(id){
   const raw=document.getElementById('sf-an').value.trim();
   const an=raw.startsWith('****')?raw:(raw.length>=4?'****'+raw.slice(-4):raw);
   const pr=getPR();
-  const inc=pr.map(r=>r.t==='mrr'?r.q+'x MRR':'$'+r.a+' flat').join(' + ');
+  const inc=pr.map(r=>`${r.q}x MRR`).join(' + ');
   const a1=document.getElementById('sf-a1').value.trim(),a2=document.getElementById('sf-a2').value.trim(),a3=document.getElementById('sf-a3').value.trim(),a4=document.getElementById('sf-a4').value.trim();
   const addr=[a1,a2,a3,a4].filter(Boolean).join(', ');
   const data={name,email,contact:document.getElementById('sf-c').value,phone:document.getElementById('sf-p').value,addr1:a1,city:a2,state:a3,zip:a4,addr,ein:document.getElementById('sf-ein').value,status:document.getElementById('sf-st').value,bank:document.getElementById('sf-bk').value,ah:document.getElementById('sf-ah').value,an,rn:document.getElementById('sf-rn').value,at:document.getElementById('sf-at').value,pm:document.getElementById('sf-pm').value,type:document.getElementById('sf-ty').value,pr,inc,trig:document.getElementById('sf-trig').value,terms:document.getElementById('sf-trm').value,aref:document.getElementById('sf-ar').value,sd:document.getElementById('sf-sd').value,owner:document.getElementById('sf-ow').value,notes:document.getElementById('sf-nt').value};

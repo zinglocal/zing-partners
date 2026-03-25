@@ -65,7 +65,8 @@ function doPost(e) {
     else if (action === 'delInv')   result = deleteRowById('Invoices', body.id);
     else if (action === 'charge')     result = handleCharge(body);
     else if (action === 'subscribe')  result = handleSubscribe(body);
-    else if (action === 'stripeInv')  result = handleStripeInv(body);
+    else if (action === 'stripeInv')   result = handleStripeInv(body);
+    else if (action === 'sendPayLink') result = handleSendPayLink(body);
     else result = { ok: false, err: 'Unknown action: ' + action };
 
     return ContentService.createTextOutput(JSON.stringify(result))
@@ -193,6 +194,44 @@ function handleSaveInv(inv) {
     bumpMeta('ni');
   }
   return { ok: true };
+}
+
+// ── PAYMENT LINKS (fixed Stripe-hosted checkout links) ────────
+const PAYMENT_LINKS = {
+  'DISCOVER': 'https://checkout.zing.work/b/cNi00ke0geST9RWcbt5J60g',
+  'BOOST':    'https://checkout.zing.work/b/5kQdRacWch11c040sL5J60h',
+  'DOMINATE': 'https://checkout.zing.work/b/cNi5kE3lCfWX8NSgrJ5J60m'
+};
+
+function handleSendPayLink(body) {
+  const { cn, ce, plan } = body;
+  if (!cn || !ce || !plan) return { ok: false, err: 'Missing customer name, email, or plan' };
+
+  const url = PAYMENT_LINKS[plan];
+  if (!url) return { ok: false, err: 'No payment link configured for plan: ' + plan };
+
+  const subject = `Your ZING ${plan} subscription — complete your payment`;
+  const html = `
+    <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
+      <div style="background:#050536;padding:24px 28px;border-radius:8px 8px 0 0">
+        <div style="color:#fff;font-size:18px;font-weight:600">ZING Website Design</div>
+      </div>
+      <div style="background:#f9f9fc;padding:28px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px">
+        <p style="margin:0 0 14px;font-size:15px;color:#111">Hi ${cn},</p>
+        <p style="margin:0 0 20px;font-size:14px;color:#444">Your <strong>ZING ${plan}</strong> subscription is ready. Click the button below to complete your payment securely through Stripe.</p>
+        <a href="${url}" style="display:inline-block;background:#050536;color:#fff;text-decoration:none;padding:13px 28px;border-radius:6px;font-size:14px;font-weight:600">Complete payment →</a>
+        <p style="margin:20px 0 0;font-size:12px;color:#888">Or copy this link: <a href="${url}" style="color:#050536">${url}</a></p>
+        <p style="margin:16px 0 0;font-size:12px;color:#aaa">Questions? Reply to this email or call us anytime.</p>
+      </div>
+    </div>`;
+
+  GmailApp.sendEmail(ce, subject, `Complete your ZING ${plan} payment: ${url}`, {
+    htmlBody: html,
+    name: 'ZING Website Design',
+    replyTo: 'hello@zing-work.com'
+  });
+
+  return { ok: true, url };
 }
 
 // ── STRIPE PLAN → PRICE ID MAP ────────────────────────────────

@@ -736,14 +736,21 @@ async function saveDeal(){
   }else if(dPA==='inv'){
     const ie=document.getElementById('inv-to')?.value;
     if(ie){
+      const btn=document.getElementById('dsave');
+      if(btn){if(btn._sending)return;btn._sending=true;btn.disabled=true;btn.style.opacity='0.6';btn.textContent='Sending invoice...';}
       const selOpt=document.querySelector('#pp-inv .ct2.on')?.textContent?.trim()||'Deposit only';
       let lines;
       if(selOpt==='Full fee')lines=[{d:deal.fd,q:1,a:fee}];
       else if(selOpt==='Sub + deposit')lines=[{d:dPlan+' subscription',q:1,a:dMrr},{d:deal.fd+' (50% deposit)',q:1,a:fee/2}];
       else if(selOpt==='Everything')lines=[{d:dPlan+' subscription',q:1,a:dMrr},{d:deal.fd,q:1,a:fee}];
       else lines=[{d:deal.fd+' (50% deposit)',q:1,a:fee/2}];
-      const ir=await api('stripeInv',{cn,ce:ie,lines,due:document.getElementById('inv-due')?.value});
-      if(ir?.id){deal.sInvId=ir.id;toast('Invoice sent via Stripe');}
+      try{
+        const ir=await api('stripeInv',{cn,ce:ie,lines,due:document.getElementById('inv-due')?.value});
+        if(ir?.id){deal.sInvId=ir.id;}
+      }catch(err){
+        if(btn){btn._sending=false;btn.disabled=false;btn.style.opacity='';btn.textContent='Send invoice & save deal';}
+        toast('Error sending invoice — try again');return;
+      }
     }
   }
   db.deals.push(deal);dPlan=null;dMrr=0;dFT='split';dPA=null;cardEl=null;
@@ -782,11 +789,19 @@ function getIL(){const l=[];document.querySelectorAll('#il > div').forEach(row=>
 async function sendIStripe(){
   const n=document.getElementById('ic-n')?.value.trim(),e=document.getElementById('ic-e')?.value.trim();
   if(!n||!e){alert('Client name and email required');return;}
+  // Disable button immediately to prevent double-sends
+  const btn=document.querySelector('.mf .btn-p');
+  if(btn){if(btn._sending)return;btn._sending=true;btn.disabled=true;btn.style.opacity='0.6';btn.textContent='Sending...';}
   const lines=getIL(),tot=lines.reduce((s,l)=>s+l.q*l.a,0);
   const inv={id:document.getElementById('ic-id')?.value,cn:n,ce:e,ca:document.getElementById('ic-a')?.value||'',id2:document.getElementById('ic-i2')?.value,dd:document.getElementById('ic-dd')?.value,terms:document.getElementById('ic-t')?.value,notes:document.getElementById('ic-nt')?.value,lines,tot,st:'Sending...',created:td()};
-  const res=await api('stripeInv',{cn:n,ce:e,lines,due:inv.dd,notes:inv.notes});
-  inv.st=res?.ok?'Sent':'Draft';inv.stripeId=res?.id||'';
-  db.invoices.push(inv);api('saveInv',{inv});sL();cM();render();toast(res?.ok?'Invoice sent via Stripe':'Saved as draft');
+  try{
+    const res=await api('stripeInv',{cn:n,ce:e,lines,due:inv.dd,notes:inv.notes});
+    inv.st=res?.ok?'Sent':'Draft';inv.stripeId=res?.id||'';
+    db.invoices.push(inv);api('saveInv',{inv});sL();cM();render();toast(res?.ok?'Invoice sent via Stripe':'Saved as draft');
+  }catch(err){
+    if(btn){btn._sending=false;btn.disabled=false;btn.style.opacity='';btn.innerHTML='<svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor" style="margin-right:4px"><path d="M1 1l12 6-12 6V8.5l8-1.5-8-1.5V1z"/></svg>Send via Stripe';}
+    toast('Error sending invoice — try again');
+  }
 }
 function saveIDraft(){
   const n=document.getElementById('ic-n')?.value.trim();if(!n){alert('Client name required');return;}

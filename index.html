@@ -450,7 +450,7 @@ function rInv(c,tr){
   </div>`:'';
   c.innerHTML=`
     <div style="display:flex;gap:8px;margin-bottom:14px">
-      ${tabs.map(([v,l])=>`<button class="ftab${invFilter===v?' on':''}" onclick="invFilter='${v}';rInv(document.getElementById('main-content'),document.getElementById('top-right'))">${l}${v!=='all'?` <span style="font-size:10px;opacity:.7">(${v==='Paid'?paidCount:db.invoices.filter(i=>i.st===v).length})</span>`:''}</button>`).join('')}
+      ${tabs.map(([v,l])=>`<button class="ftab${invFilter===v?' on':''}" onclick="invFilter='${v}';rInv(document.getElementById('cnt'),document.getElementById('tr'))">${l}${v!=='all'?` <span style="font-size:10px;opacity:.7">(${v==='Paid'?paidCount:db.invoices.filter(i=>i.st===v).length})</span>`:''}</button>`).join('')}
     </div>
     ${summaryBar}
     <div class="card"><div class="tw"><table>

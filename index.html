@@ -736,15 +736,11 @@ function addDeal(){
     <div class="fs">Notes</div>
     <div class="fg"><textarea id="df-nt" placeholder="Special terms or context..."></textarea></div>
     <div class="fs">Collect payment</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
       <button class="pab" id="pa-card" onclick="dSPA('card')"><div class="patp"><div class="pai" id="pi-card"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="12" height="8" rx="1.5"/><path d="M1 6.5h12"/></svg></div><div class="pat">Take payment now</div></div><div class="pad">Rep enters card on the call</div></button>
       <button class="pab" id="pa-link" onclick="dSPA('link')"><div class="patp"><div class="pai" id="pi-link"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5.5 8.5a3 3 0 0 0 4.24 0l2-2a3 3 0 0 0-4.24-4.24l-1 1"/><path d="M8.5 5.5a3 3 0 0 0-4.24 0l-2 2a3 3 0 0 0 4.24 4.24l1-1"/></svg></div><div class="pat">Send payment link</div></div><div class="pad">Customer pays via Stripe checkout</div></button>
-      <button class="pab" id="pa-inv" onclick="dSPA('inv')"><div class="patp"><div class="pai" id="pi-inv"><svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor"><path d="M1 1l12 6-12 6V8.5l8-1.5-8-1.5V1z"/></svg></div><div class="pat">Send link to customer</div></div><div class="pad">Formal Stripe invoice by email</div></button>
     </div>
-    <div class="ppan" id="pp-inv">
-      <div class="ctog"><button class="ct2 on" onclick="togCT(this)">Deposit only</button><button class="ct2" onclick="togCT(this)">Full fee</button><button class="ct2" onclick="togCT(this)">Sub + deposit</button><button class="ct2" onclick="togCT(this)">Everything</button></div>
-      <div class="r2"><div class="fg"><label>Send to</label><input id="inv-to" placeholder="client@email.com"></div><div class="fg"><label>Due date</label><input id="inv-due" type="date" value="${new Date(Date.now()+14*864e5).toISOString().split('T')[0]}"></div></div>
-    </div>
+    <div class="ppan" id="pp-inv" style="display:none"></div>
     <div class="ppan" id="pp-card">
       <div class="sbdg"><span class="spl">stripe</span>Card details processed securely — never stored here</div>
       <div class="ctog"><button class="ct2 on" id="ct-dep" onclick="dSCC('deposit')">Deposit only</button><button class="ct2" id="ct-sub" onclick="dSCC('sub')">Subscription only</button><button class="ct2" id="ct-both" onclick="dSCC('both')">Both</button></div>

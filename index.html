@@ -242,6 +242,8 @@ code{background:var(--bg);border:1px solid var(--bo);border-radius:4px;padding:1
 
 <script>
 const CK='zing_cfg_v4',DK='zing_data_v4';
+const SCRIPT_URL='https://script.google.com/macros/s/AKfycbxc1Q8JE0PPEaulGLon9szgvbvVP2Dpa8NyE7XNjejlgx-y77VW_7fJnyckYaMvtuQ5/exec';
+const STRIPE_PK='pk_live_51MS2Z5JdCDYxERimgJ3xbxa3gaPsANikkzIJOLfB387z3EDNidKzhsJAcIAXxoAgNsNT0V7UZ69rqvKpI6SbfTnL00RMwCP6yt';
 const REPS=['Ryan','Elizabeth','Eric','Elliot','Caden','Jon','Zach','Jaime','Amy'];
 const SL=['','Deal sold','Site published','Fee collected','Partner paid'];
 let cfg={},db={sources:[],deals:[],invoices:[],ns:1,nd:1,ni:1};
@@ -252,6 +254,8 @@ let pRC=0,iLC=0,view='dash';
 
 function init(){
   cfg=JSON.parse(localStorage.getItem(CK)||'{}');
+  // Always keep URL and Stripe key current — update without touching data
+  cfg.url=SCRIPT_URL;cfg.spk=STRIPE_PK;localStorage.setItem(CK,JSON.stringify(cfg));
   db=JSON.parse(localStorage.getItem(DK)||JSON.stringify(db));
   if(!cfg.url){document.getElementById('setup').style.display='block';return;}
   document.getElementById('app').style.display='flex';

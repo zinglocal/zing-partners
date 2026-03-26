@@ -798,7 +798,7 @@ async function saveDeal(){
       // Both — deposit added to first subscription invoice by the server
       pi=await api('subscribe',{email:deal.email,name:cn,plan:dPlan,depositAmount:h,desc:`${deal.fd} (50% deposit)`});
     }
-    if(!pi||!pi.clientSecret){document.getElementById('serr').textContent='Payment failed: '+(pi?.error||'Could not create payment');if(btn){btn.textContent='Charge & save deal';btn.disabled=false;}return;}
+    if(!pi||!pi.clientSecret){document.getElementById('serr').textContent='Payment failed: '+(pi?.err||pi?.error||'No response from Apps Script — check Settings URL');if(btn){btn.textContent='Charge & save deal';btn.disabled=false;}return;}
     // Step 2: confirm card in browser (handles 3DS automatically)
     const{paymentIntent,error}=await stripe.confirmCardPayment(pi.clientSecret,{payment_method:{card:cardEl}});
     if(error){document.getElementById('serr').textContent='Payment failed: '+error.message;if(btn){btn.textContent='Charge & save deal';btn.disabled=false;}return;}

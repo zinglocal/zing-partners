@@ -436,7 +436,8 @@ function rDeals(c,tr){
       <td class="mo">${d.id}</td>
       <td><div style="font-weight:500">${d.customer}</div><div class="mo">${d.email||''}</div></td>
       <td style="font-size:12px">${d.rep||''}</td><td style="font-size:12px">${d.srcName||''}</td>
-      <td><span class="badge bp">${d.plan}</span>${d.saleTotal?`<span style="font-size:11px;color:var(--mu);margin-left:5px">${f$(d.saleTotal)}</span>`:''}</td>
+      <td><span class="badge bp">${d.plan}</span></td>
+      <td style="font-weight:700;font-size:15px;color:var(--pu);font-family:'DM Mono',monospace">${d.saleTotal?f$(d.saleTotal):'—'}</td>
       <td>${st(d.stage)}</td>
       <td style="font-weight:500;color:var(--pu);font-family:'DM Mono',monospace">${f$(d.commission)}</td>
       <td>${sb(d.stage)}</td>

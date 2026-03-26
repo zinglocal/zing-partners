@@ -281,7 +281,15 @@ async function api(action,payload={}){
 
 async function sync(){
   const d=await api('getAll');
-  if(d&&d.sources){db={...db,...d};sL();}
+  if(d&&d.sources){
+    // Only overwrite local arrays if the sheet has data, to avoid wiping local records with empty sheet
+    const merged={...db};
+    if(d.sources&&d.sources.length>0)merged.sources=d.sources;
+    if(d.deals&&d.deals.length>0)merged.deals=d.deals;
+    if(d.invoices&&d.invoices.length>0)merged.invoices=d.invoices;
+    if(d.ns)merged.ns=d.ns;if(d.nd)merged.nd=d.nd;if(d.ni)merged.ni=d.ni;
+    db=merged;sL();
+  }
   updCnt();
 }
 

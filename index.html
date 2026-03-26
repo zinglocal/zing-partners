@@ -250,9 +250,11 @@ let stripe=null,cardEl=null;
 let dPlan=null,dMrr=0,dFT='split',dPA=null,dCC='deposit';
 let pRC=0,iLC=0,view='dash';
 
+const DEFAULTS={url:'https://script.google.com/macros/s/AKfycbyJ1WdpD6TQ5Ey7jTlorO2pRjr9CfaEgMiO4eL-Awo77rNWt6fxxZFrhNAdb9mersts/exec',spk:'pk_live_51MS2Z5JdCDYxERimgJ3xbxa3gaPsANikkzIJOLfB387z3EDNidKzhsJAcIAXxoAgNsNT0V7UZ69rqvKpI6SbfTnL00RMwCP6yt'};
 function init(){
   cfg=JSON.parse(localStorage.getItem(CK)||'{}');
-  db=JSON.parse(localStorage.getItem(DK)||JSON.stringify(db));
+  if(!cfg.url)cfg={...DEFAULTS,...cfg};
+  localStorage.setItem(CK,JSON.stringify(cfg));
   if(!cfg.url){document.getElementById('setup').style.display='block';return;}
   document.getElementById('app').style.display='flex';
   if(cfg.spk)try{stripe=Stripe(cfg.spk);}catch(e){}

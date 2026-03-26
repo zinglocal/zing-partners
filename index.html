@@ -250,11 +250,9 @@ let stripe=null,cardEl=null;
 let dPlan=null,dMrr=0,dFT='split',dPA=null,dCC='deposit';
 let pRC=0,iLC=0,view='dash';
 
-const DEFAULTS={url:'https://script.google.com/macros/s/AKfycbyJ1WdpD6TQ5Ey7jTlorO2pRjr9CfaEgMiO4eL-Awo77rNWt6fxxZFrhNAdb9mersts/exec',spk:'pk_live_51MS2Z5JdCDYxERimgJ3xbxa3gaPsANikkzIJOLfB387z3EDNidKzhsJAcIAXxoAgNsNT0V7UZ69rqvKpI6SbfTnL00RMwCP6yt'};
 function init(){
   cfg=JSON.parse(localStorage.getItem(CK)||'{}');
-  if(!cfg.url)cfg={...DEFAULTS,...cfg};
-  localStorage.setItem(CK,JSON.stringify(cfg));
+  db=JSON.parse(localStorage.getItem(DK)||JSON.stringify(db));
   if(!cfg.url){document.getElementById('setup').style.display='block';return;}
   document.getElementById('app').style.display='flex';
   if(cfg.spk)try{stripe=Stripe(cfg.spk);}catch(e){}
@@ -281,15 +279,7 @@ async function api(action,payload={}){
 
 async function sync(){
   const d=await api('getAll');
-  if(d&&d.sources){
-    // Only overwrite local arrays if the sheet has data, to avoid wiping local records with empty sheet
-    const merged={...db};
-    if(d.sources&&d.sources.length>0)merged.sources=d.sources;
-    if(d.deals&&d.deals.length>0)merged.deals=d.deals;
-    if(d.invoices&&d.invoices.length>0)merged.invoices=d.invoices;
-    if(d.ns)merged.ns=d.ns;if(d.nd)merged.nd=d.nd;if(d.ni)merged.ni=d.ni;
-    db=merged;sL();
-  }
+  if(d&&d.sources){db={...db,...d};sL();}
   updCnt();
 }
 

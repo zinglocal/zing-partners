@@ -434,12 +434,12 @@ function rDeals(c,tr){
     <tbody>${!db.deals.length?`<tr><td colspan="9" style="text-align:center;color:var(--fa);padding:40px">No deals yet</td></tr>`:
     db.deals.map(d=>`<tr>
       <td class="mo">${d.id}</td>
-      <td><div style="font-weight:500">${d.customer}</div><div class="mo">${d.email||''}</div></td>
-      <td style="font-size:12px">${d.rep||''}</td><td style="font-size:12px">${d.srcName||''}</td>
+      <td><div style="font-weight:500">${[d.firstName,d.lastName].filter(Boolean).join(' ')||d.customer}</div><div style="font-size:12px;color:var(--mu)">${d.customer}</div><div class="mo">${d.email||''}</div><div class="mo">${d.phone||''}</div></td>
+      <td style="font-size:12px">${d.rep||''}</td><td style="font-size:12px">${d.srcName==='Direct'||!d.srcName?'<span style="color:var(--mu)">Direct</span>':d.srcName}</td>
       <td><span class="badge bp">${d.plan}</span></td>
       <td style="font-weight:700;font-size:15px;color:var(--pu);font-family:'DM Mono',monospace">${d.saleTotal?f$(d.saleTotal):'—'}</td>
       <td>${st(d.stage)}</td>
-      <td style="font-weight:500;color:var(--pu);font-family:'DM Mono',monospace">${f$(d.commission)}</td>
+      <td style="font-weight:500;color:var(--pu);font-family:'DM Mono',monospace">${d.commission>0?f$(d.commission):'—'}</td>
       <td>${sb(d.stage)}</td>
       <td><a href="#" onclick="openDeal('${d.id}');return false" style="font-size:12px;color:var(--pu)">Manage →</a></td>
     </tr>`).join('')}</tbody>
@@ -705,18 +705,20 @@ function confAdv(id,s){
 function addDeal(){
   pRC=0;dPlan=null;dMrr=0;dFT='split';dPA=null;dCC='deposit';cardEl=null;
   const aS=db.sources.filter(s=>s.status==='Active');
-  if(!aS.length){alert('Add an active lead source first');return;}
   oM('Log new deal',`
-    <div class="fs" style="border-top:none;padding-top:0">Lead source & rep</div>
-    <div class="r2"><div class="fg"><label>Lead source *</label><select id="df-s" onchange="dUC()"><option value="">Choose...</option>${aS.map(s=>`<option value="${s.id}">${s.name} (${s.id})</option>`).join('')}</select></div>
-    <div class="fg"><label>Incentive (auto)</label><input id="df-i" readonly placeholder="Auto-filled"></div></div>
-    <div class="r2"><div class="fg"><label>Sales rep *</label><select id="df-r"><option value="">Select rep...</option>${REPS.map(r=>`<option>${r}</option>`).join('')}</select></div>
-    <div class="fg"><label>Deal date *</label><input id="df-dt" type="date" value="${td()}"></div></div>
-    <div class="fs">Customer</div>
+    <div class="fs" style="border-top:none;padding-top:0">Customer</div>
+    <div class="r2"><div class="fg"><label>First name</label><input id="df-fn" placeholder="Jane"></div>
+    <div class="fg"><label>Last name</label><input id="df-ln" placeholder="Smith"></div></div>
     <div class="r2"><div class="fg"><label>Business name *</label><input id="df-cn" placeholder="Blue Sky Electric LLC"></div>
-    <div class="fg"><label>Email</label><input id="df-ce" type="email" placeholder="owner@business.com"></div></div>
+    <div class="fg"><label>Email *</label><input id="df-ce" type="email" placeholder="owner@business.com"></div></div>
     <div class="r2"><div class="fg"><label>Phone</label><input id="df-cp" placeholder="720-555-0100"></div>
     <div class="fg"><label>City / location</label><input id="df-cl" placeholder="Denver, CO"></div></div>
+    <div class="fs">Sales rep &amp; date</div>
+    <div class="r2"><div class="fg"><label>Sales rep</label><select id="df-r"><option value="">Select rep...</option>${REPS.map(r=>`<option>${r}</option>`).join('')}</select></div>
+    <div class="fg"><label>Deal date</label><input id="df-dt" type="date" value="${td()}"></div></div>
+    <div class="fs">Lead source <span style="font-size:10px;font-weight:400;color:var(--mu)">(optional — only if referred by a partner)</span></div>
+    <div class="r2"><div class="fg"><label>Lead source</label><select id="df-s" onchange="dUC()"><option value="">None / Direct sale</option>${aS.map(s=>`<option value="${s.id}">${s.name} (${s.id})</option>`).join('')}</select></div>
+    <div class="fg"><label>Incentive (auto)</label><input id="df-i" readonly placeholder="Auto-filled if source selected"></div></div>
     <div class="fs">Product sold</div>
     <div class="pg">
       <div class="pc" onclick="dSP(this,'DISCOVER',59)"><div class="pn">DISCOVER</div><div class="pp">$59<span style="font-size:10px;font-weight:400">/mo</span></div><div class="pd">Starter local SEO + website</div></div>
@@ -764,7 +766,7 @@ function addDeal(){
 const STRIPE_PRICE_LINKS={DISCOVER:'https://dashboard.stripe.com/prices/price_1ShamzJdCDYxERimazBbXFQM',BOOST:'https://dashboard.stripe.com/prices/price_1Sf2b9JdCDYxERimXLjtfVYq',DOMINATE:'https://dashboard.stripe.com/prices/price_1SmiAOJdCDYxERimC2HsmRW7'};
 function dSP(el,plan,mrr){document.querySelectorAll('.pc').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');dPlan=plan;dMrr=mrr;const mrrEl=document.getElementById('df-mrr');if(mrrEl)mrrEl.value=mrr;const stEl=document.getElementById('df-st');if(stEl&&!stEl.value)stEl.value=mrr;const unitsEl=document.getElementById('df-units');if(unitsEl&&!unitsEl.value)unitsEl.value=1;const lnk=document.getElementById('df-stripe-link');if(lnk){lnk.href=STRIPE_PRICE_LINKS[plan]||'#';lnk.style.display='inline';}dUC();}
 function dFC(){dUCB();}
-function dUC(){const sid=document.getElementById('df-s')?.value;const src=db.sources.find(s=>s.id===sid);if(!src)return;document.getElementById('df-i').value=src.inc||'';const mrr=parseFloat(document.getElementById('df-mrr')?.value)||0;dMrr=mrr;const st=parseFloat(document.getElementById('df-st')?.value)||0;const base=st||mrr;const c=base>0?(src.pr?src.pr.reduce((t,r)=>t+(r.t==='mrr'?base*(parseInt(r.q)||1):(parseFloat(r.a)||0)*(parseInt(r.q)||1)),0):base*2):0;if(document.getElementById('df-cv'))document.getElementById('df-cv').textContent=c>0?f$(c):'—';if(document.getElementById('df-cc'))document.getElementById('df-cc').textContent=src.inc||'Based on payout rules';dUCB();}
+function dUC(){const sid=document.getElementById('df-s')?.value;const src=sid?db.sources.find(s=>s.id===sid):null;const iEl=document.getElementById('df-i');if(iEl)iEl.value=src?src.inc||'':'';const mrr=parseFloat(document.getElementById('df-mrr')?.value)||0;dMrr=mrr;const st=parseFloat(document.getElementById('df-st')?.value)||0;const base=st||mrr;const c=src&&base>0?(src.pr?src.pr.reduce((t,r)=>t+(r.t==='mrr'?base*(parseInt(r.q)||1):(parseFloat(r.a)||0)*(parseInt(r.q)||1)),0):base*2):0;const cvEl=document.getElementById('df-cv');if(cvEl)cvEl.textContent=src?(c>0?f$(c):'—'):'N/A (direct sale)';const ccEl=document.getElementById('df-cc');if(ccEl)ccEl.textContent=src?(src.inc||'Based on payout rules'):'No lead source — no commission';dUCB();}
 function dUCB(){const f=parseFloat(document.getElementById('df-f')?.value)||0;const mrr=parseFloat(document.getElementById('df-mrr')?.value)||0;const bd=document.getElementById('d-cb');if(!bd)return;let lines=[],tot=0;if(dCC==='deposit'||dCC==='both'){lines.push(['One-time fee',f]);tot+=f;}if(dCC==='sub'||dCC==='both'){lines.push([`${dPlan||'Plan'} subscription`,mrr]);tot+=mrr;}bd.innerHTML=lines.map(([k,v])=>`<div class="cbr"><span>${k}</span><span class="cbv">${f$(v)}</span></div>`).join('')+`<div class="cbt"><span>Charging now</span><span class="cbtv">${f$(tot)}</span></div>`;}
 function dSPA(t){dPA=t;document.querySelectorAll('.pab').forEach(b=>b.classList.remove('on'));['pi-inv','pi-card','pi-link'].forEach(id=>{const el=document.getElementById(id);if(el){el.style.background='';el.style.color='';}});document.getElementById('pa-'+t).classList.add('on');document.getElementById('pi-'+t).style.background='var(--pu)';document.getElementById('pi-'+t).style.color='#fff';document.querySelectorAll('.ppan').forEach(p=>p.classList.remove('show'));document.getElementById('pp-'+t).classList.add('show');if(t==='inv'){const ce=document.getElementById('df-ce')?.value;const invTo=document.getElementById('inv-to');if(invTo&&ce&&!invTo.value)invTo.value=ce;}if(t==='link'){const ce=document.getElementById('df-ce')?.value;const lt=document.getElementById('link-to');if(lt&&ce&&!lt.value)lt.value=ce;}if(t==='card')initSE();const sb=document.getElementById('dsave');if(sb)sb.textContent=t==='card'?'Charge & save deal':t==='link'?'Save deal & send payment link':'Send link & save deal';}
 function togCT(el){el.closest('.ctog').querySelectorAll('.ct2').forEach(c=>c.classList.remove('on'));el.classList.add('on');}
@@ -774,19 +776,22 @@ function initSE(){if(!stripe){document.getElementById('serr').textContent='Strip
 
 async function saveDeal(){
   const cn=document.getElementById('df-cn')?.value.trim();
-  if(!cn){alert('Customer name required');return;}
+  if(!cn){alert('Business name required');return;}
   if(!dPlan){alert('Select a product');return;}
-  const sid=document.getElementById('df-s')?.value;
-  if(!sid){alert('Select a lead source');return;}
-  const src=db.sources.find(s=>s.id===sid);
+  const ce=document.getElementById('df-ce')?.value.trim();
+  if(!ce){alert('Customer email required');return;}
+  const sid=document.getElementById('df-s')?.value||'';
+  const src=sid?db.sources.find(s=>s.id===sid):null;
+  const fn=document.getElementById('df-fn')?.value.trim()||'';
+  const ln=document.getElementById('df-ln')?.value.trim()||'';
   const fee=parseFloat(document.getElementById('df-f')?.value)||0;
   const mrr=parseFloat(document.getElementById('df-mrr')?.value)||0;
   const saleTotal=parseFloat(document.getElementById('df-st')?.value)||0;
   const units=parseInt(document.getElementById('df-units')?.value)||1;
   dMrr=mrr;
   const base=saleTotal||mrr;
-  const comm=base>0?(src.pr?src.pr.reduce((t,r)=>t+(r.t==='mrr'?base*(parseInt(r.q)||1):(parseFloat(r.a)||0)*(parseInt(r.q)||1)),0):base*2):0;
-  const deal={id:nDid(),customer:cn,email:document.getElementById('df-ce')?.value||'',phone:document.getElementById('df-cp')?.value||'',loc:document.getElementById('df-cl')?.value||'',plan:dPlan,mrr:mrr,units:units,saleTotal:saleTotal,commission:comm,srcId:sid,srcName:src.name,rep:document.getElementById('df-r')?.value||'',date:document.getElementById('df-dt')?.value||td(),otf:fee,fd:document.getElementById('df-fd')?.value||'Website launch fee',ft:'',notes:document.getElementById('df-nt')?.value||'',stage:1,s1d:td(),s2d:'',s2u:'',s2b:'',s3d:'',s3a:0,s3r:'',s4d:'',s4a:0,s4m:'',s4r:'',s4ab:'',created:td()};
+  const comm=src&&base>0?(src.pr?src.pr.reduce((t,r)=>t+(r.t==='mrr'?base*(parseInt(r.q)||1):(parseFloat(r.a)||0)*(parseInt(r.q)||1)),0):base*2):0;
+  const deal={id:nDid(),customer:cn,firstName:fn,lastName:ln,email:ce,phone:document.getElementById('df-cp')?.value||'',loc:document.getElementById('df-cl')?.value||'',plan:dPlan,mrr:mrr,units:units,saleTotal:saleTotal,commission:comm,srcId:sid,srcName:src?src.name:'Direct',rep:document.getElementById('df-r')?.value||'',date:document.getElementById('df-dt')?.value||td(),otf:fee,fd:document.getElementById('df-fd')?.value||'Website launch fee',ft:'',notes:document.getElementById('df-nt')?.value||'',stage:1,s1d:td(),s2d:'',s2u:'',s2b:'',s3d:'',s3a:0,s3r:'',s4d:'',s4a:0,s4m:'',s4r:'',s4ab:'',created:td()};
   if(dPA==='card'&&cardEl&&stripe){
     const btn=document.getElementById('dsave');if(btn){btn.textContent='Processing...';btn.disabled=true;}
     const h=Math.round(fee/2*100);

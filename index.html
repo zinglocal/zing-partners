@@ -388,14 +388,16 @@ function rDash(c,tr){
   <div class="card">
     <div class="ch"><span class="ct">Recent deals</span><button class="btn btn-sm" style="border:none;background:none;color:var(--pu)" onclick="nav('deals')">View all</button></div>
     <div class="tw"><table>
-      <thead><tr><th>Customer</th><th>Partner</th><th>Plan</th><th>Commission</th><th>Stage</th></tr></thead>
+      <thead><tr><th>Customer</th><th>Partner</th><th>Plan</th><th>Subscription</th><th>One-time</th><th>Commission</th><th>Stage</th></tr></thead>
       <tbody>${db.deals.slice(-8).reverse().map(d=>`<tr>
         <td><div style="font-weight:500">${d.customer}</div><div class="mo">${d.date||''}</div></td>
-        <td style="font-size:12px">${d.srcName||''}</td>
+        <td style="font-size:12px">${d.srcName==='Direct'||!d.srcName?'<span style="color:var(--mu)">Direct</span>':d.srcName}</td>
         <td><span class="badge bp">${d.plan||''}</span></td>
-        <td style="font-weight:500;color:var(--pu);font-family:'DM Mono',monospace">${f$(d.commission)}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:13px">${d.mrr?f$(d.mrr)+'/mo':'—'}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:13px">${d.otf?f$(d.otf):'—'}</td>
+        <td style="font-weight:500;color:var(--pu);font-family:'DM Mono',monospace">${d.commission>0?f$(d.commission):'—'}</td>
         <td>${sb(d.stage)}</td>
-      </tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--fa);padding:30px">No deals yet</td></tr>'}</tbody>
+      </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--fa);padding:30px">No deals yet</td></tr>'}</tbody>
     </table></div>
   </div>`;
 }
@@ -430,13 +432,15 @@ function rSrc(c,tr){
 function rDeals(c,tr){
   tr.innerHTML=`<button class="btn btn-p btn-sm" onclick="addDeal()">+ Log deal</button><button class="btn btn-sm" onclick="xCSV('deals')">↓ CSV</button>`;
   c.innerHTML=`<div class="card"><div class="tw"><table>
-    <thead><tr><th>ID</th><th>Customer</th><th>Rep</th><th>Partner</th><th>Plan</th><th>Sale Total</th><th>Commission</th><th>Stage</th><th></th></tr></thead>
-    <tbody>${!db.deals.length?`<tr><td colspan="9" style="text-align:center;color:var(--fa);padding:40px">No deals yet</td></tr>`:
+    <thead><tr><th>ID</th><th>Customer</th><th>Rep</th><th>Partner</th><th>Plan</th><th>Subscription</th><th>One-time</th><th>Sale Total</th><th>Commission</th><th>Stage</th><th></th></tr></thead>
+    <tbody>${!db.deals.length?`<tr><td colspan="11" style="text-align:center;color:var(--fa);padding:40px">No deals yet</td></tr>`:
     db.deals.map(d=>`<tr>
       <td class="mo">${d.id}</td>
       <td><div style="font-weight:500">${[d.firstName,d.lastName].filter(Boolean).join(' ')||d.customer}</div><div style="font-size:12px;color:var(--mu)">${d.customer}</div><div class="mo">${d.email||''}</div><div class="mo">${d.phone||''}</div></td>
       <td style="font-size:12px">${d.rep||''}</td><td style="font-size:12px">${d.srcName==='Direct'||!d.srcName?'<span style="color:var(--mu)">Direct</span>':d.srcName}</td>
       <td><span class="badge bp">${d.plan}</span></td>
+      <td style="font-family:'DM Mono',monospace;font-size:13px">${d.mrr?f$(d.mrr)+'/mo':'—'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:13px">${d.otf?f$(d.otf):'—'}</td>
       <td style="font-weight:700;font-size:15px;color:var(--pu);font-family:'DM Mono',monospace">${d.saleTotal?f$(d.saleTotal):'—'}</td>
       <td>${st(d.stage)}</td>
       <td style="font-weight:500;color:var(--pu);font-family:'DM Mono',monospace">${d.commission>0?f$(d.commission):'—'}</td>

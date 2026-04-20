@@ -924,20 +924,26 @@ function getIL(){const l=[];document.querySelectorAll('#il > div').forEach(row=>
 async function sendIStripe(){
   const n=document.getElementById('ic-n')?.value.trim(),e=document.getElementById('ic-e')?.value.trim();
   if(!n||!e){alert('Client name and email required');return;}
-  // Disable button immediately to prevent double-sends
+  const lines=getIL();
+  if(!lines.length){alert('Add at least one line item with a description and amount');return;}
   const btn=document.querySelector('.mf .btn-p');
   if(btn){if(btn._sending)return;btn._sending=true;btn.disabled=true;btn.style.opacity='0.6';btn.textContent='Sending...';}
-  const lines=getIL(),tot=lines.reduce((s,l)=>s+l.q*l.a,0);
+  const tot=lines.reduce((s,l)=>s+l.q*l.a,0);
   const inv={id:document.getElementById('ic-id')?.value,cn:n,ce:e,ca:document.getElementById('ic-a')?.value||'',id2:document.getElementById('ic-i2')?.value,dd:document.getElementById('ic-dd')?.value,terms:document.getElementById('ic-t')?.value,notes:document.getElementById('ic-nt')?.value,lines,tot,st:'Sending...',created:td()};
   try{
     const res=await api('stripeInv',{cn:n,ce:e,lines,due:inv.dd,notes:inv.notes});
-    inv.st=res?.ok?'Sent':'Draft';inv.stripeId=res?.id||'';
-    db.invoices.push(inv);api('saveInv',{inv});sL();
-    if(btn){btn.style.background='#16a34a';btn.style.opacity='1';btn.innerHTML='<svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor" style="margin-right:4px"><path d="M2 7l3.5 3.5L12 3"/></svg>'+(res?.ok?'Invoice sent!':'Saved as draft');}
-    setTimeout(()=>{cM();render();},1500);
+    if(res?.ok){
+      inv.st='Sent';inv.stripeId=res?.id||'';
+      db.invoices.push(inv);api('saveInv',{inv});sL();
+      if(btn){btn.style.background='#16a34a';btn.style.opacity='1';btn.innerHTML='<svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor" style="margin-right:4px"><path d="M2 7l3.5 3.5L12 3"/></svg>Invoice sent!';}
+      setTimeout(()=>{cM();render();},1500);
+    }else{
+      if(btn){btn._sending=false;btn.disabled=false;btn.style.opacity='';btn.innerHTML='<svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor" style="margin-right:4px"><path d="M1 1l12 6-12 6V8.5l8-1.5-8-1.5V1z"/></svg>Send via Stripe';}
+      alert('Failed to send: '+(res?.err||'Server error — try again'));
+    }
   }catch(err){
     if(btn){btn._sending=false;btn.disabled=false;btn.style.opacity='';btn.innerHTML='<svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor" style="margin-right:4px"><path d="M1 1l12 6-12 6V8.5l8-1.5-8-1.5V1z"/></svg>Send via Stripe';}
-    toast('Error sending invoice — try again');
+    alert('Error sending invoice: '+err.message);
   }
 }
 function saveIDraft(){
@@ -958,7 +964,12 @@ function openInv(id){
     </div>
     <table style="font-size:12px;margin-bottom:12px"><thead><tr><th>Description</th><th style="text-align:right">Qty</th><th style="text-align:right">Amount</th></tr></thead><tbody>${(inv.lines||[]).map(l=>`<tr><td>${l.d}</td><td style="text-align:right">${l.q}</td><td style="text-align:right;font-family:'DM Mono',monospace">${f$(l.q*l.a)}</td></tr>`).join('')}</tbody></table>
     ${inv.st!=='Paid'?`<div class="fs">Mark as paid</div><div class="r2"><div class="fg"><label>Payment date</label><input id="ipd" type="date" value="${td()}"></div><div class="fg"><label>Reference</label><input id="ipr" placeholder="TXN or Stripe ref"></div></div>`:''}
-    <div class="mf"><button class="btn" onclick="cM()">Close</button><button class="btn btn-sm" style="color:#dc2626;border-color:#dc2626" onclick="delInv('${inv.id}')">Delete</button>${inv.st!=='Paid'?`<button class="btn btn-g btn-sm" onclick="markPaid('${inv.id}')">Mark as paid</button>`:''}</div>`);
+    <div class="mf"><button class="btn" onclick="cM()">Close</button><button class="btn btn-sm" style="color:#dc2626;border-color:#dc2626" onclick="delInv('${inv.id}')">Delete</button>${inv.st!=='Paid'&&inv.stripeId?`<button class="btn btn-sm" onclick="resendInv('${inv.stripeId}','${inv.ce}')">↑ Resend</button>`:''} ${inv.st!=='Paid'?`<button class="btn btn-g btn-sm" onclick="markPaid('${inv.id}')">Mark as paid</button>`:''}</div>`);
+}
+async function resendInv(stripeId,ce){
+  if(!confirm('Resend invoice to '+ce+'?'))return;
+  const res=await api('resendStripeInv',{stripeId});
+  toast(res?.ok?'Invoice resent to '+ce:'Failed to resend — '+( res?.err||'try again'));
 }
 function markPaid(id){const inv=db.invoices.find(x=>x.id===id);if(!inv)return;inv.st='Paid';inv.pd=document.getElementById('ipd')?.value;inv.pr2=document.getElementById('ipr')?.value;api('saveInv',{inv});sL();cM();render();toast('Invoice marked as paid');}
 function delInv(id){if(!confirm('Delete this invoice? This cannot be undone.'))return;db.invoices=db.invoices.filter(i=>i.id!==id);api('delInv',{id});sL();cM();render();toast('Invoice deleted');}

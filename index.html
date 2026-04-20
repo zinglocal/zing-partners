@@ -706,11 +706,17 @@ function confAdv(id,s){
 }
 
 // ── ADD DEAL ──────────────────────────────────────────────────
+let dType='sub'; // 'sub' or 'otf'
 function addDeal(){
-  pRC=0;dPlan=null;dMrr=0;dFT='split';dPA=null;dCC='deposit';cardEl=null;
+  pRC=0;dPlan=null;dMrr=0;dFT='split';dPA=null;dCC='sub';dType='sub';cardEl=null;
   const aS=db.sources.filter(s=>s.status==='Active');
   oM('Log new deal',`
-    <div class="fs" style="border-top:none;padding-top:0">Customer</div>
+    <div class="fs" style="border-top:none;padding-top:0">Payment type</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px">
+      <button class="pab on" id="dt-sub" onclick="dSetType('sub')"><div class="patp"><div class="pai" id="dti-sub" style="background:var(--pu);color:#fff"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="12" height="8" rx="1.5"/><path d="M1 6.5h12"/></svg></div><div class="pat">Subscription</div></div><div class="pad">Recurring monthly plan</div></button>
+      <button class="pab" id="dt-otf" onclick="dSetType('otf')"><div class="patp"><div class="pai" id="dti-otf"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 1v12M3 5h6a2 2 0 0 1 0 4H4"/></svg></div><div class="pat">One Time Fee</div></div><div class="pad">Single charge only</div></button>
+    </div>
+    <div class="fs">Customer</div>
     <div class="r2"><div class="fg"><label>First name</label><input id="df-fn" placeholder="Jane"></div>
     <div class="fg"><label>Last name</label><input id="df-ln" placeholder="Smith"></div></div>
     <div class="r2"><div class="fg"><label>Business name *</label><input id="df-cn" placeholder="Blue Sky Electric LLC"></div>
@@ -720,68 +726,88 @@ function addDeal(){
     <div class="fs">Sales rep &amp; date</div>
     <div class="r2"><div class="fg"><label>Sales rep</label><select id="df-r"><option value="">Select rep...</option>${REPS.map(r=>`<option>${r}</option>`).join('')}</select></div>
     <div class="fg"><label>Deal date</label><input id="df-dt" type="date" value="${td()}"></div></div>
-    <div class="fs">Lead source <span style="font-size:10px;font-weight:400;color:var(--mu)">(optional — only if referred by a partner)</span></div>
+    <div class="fs">Lead source <span style="font-size:10px;font-weight:400;color:var(--mu)">(optional)</span></div>
     <div class="r2"><div class="fg"><label>Lead source</label><select id="df-s" onchange="dUC()"><option value="">None / Direct sale</option>${aS.map(s=>`<option value="${s.id}">${s.name} (${s.id})</option>`).join('')}</select></div>
     <div class="fg"><label>Incentive (auto)</label><input id="df-i" readonly placeholder="Auto-filled if source selected"></div></div>
-    <div class="fs">Product sold</div>
-    <div class="pg">
-      <div class="pc" onclick="dSP(this,'DISCOVER',59)"><div class="pn">DISCOVER</div><div class="pp">$59<span style="font-size:10px;font-weight:400">/mo</span></div><div class="pd">Starter local SEO + website</div></div>
-      <div class="pc" onclick="dSP(this,'BOOST',149)"><div class="pn">BOOST</div><div class="pp">$149<span style="font-size:10px;font-weight:400">/mo</span></div><div class="pd">Enhanced SEO + listings</div></div>
-      <div class="pc" onclick="dSP(this,'DOMINATE',249)"><div class="pn">DOMINATE</div><div class="pp">$249<span style="font-size:10px;font-weight:400">/mo</span></div><div class="pd">Full local dominance suite</div></div>
+
+    <div id="dt-sub-section">
+      <div class="fs">Product</div>
+      <div class="pg">
+        <div class="pc" onclick="dSP(this,'DISCOVER',59)"><div class="pn">DISCOVER</div><div class="pp">$59<span style="font-size:10px;font-weight:400">/mo</span></div><div class="pd">Starter local SEO + website</div></div>
+        <div class="pc" onclick="dSP(this,'BOOST',149)"><div class="pn">BOOST</div><div class="pp">$149<span style="font-size:10px;font-weight:400">/mo</span></div><div class="pd">Enhanced SEO + listings</div></div>
+        <div class="pc" onclick="dSP(this,'DOMINATE',249)"><div class="pn">DOMINATE</div><div class="pp">$249<span style="font-size:10px;font-weight:400">/mo</span></div><div class="pd">Full local dominance suite</div></div>
+      </div>
+      <div class="r2" style="margin-bottom:12px">
+        <div class="fg"><label>Subscription $/mo <span style="font-size:10px;color:var(--mu)">(auto-filled)</span></label><div class="pfx"><span>$</span><input id="df-mrr" type="number" placeholder="Select plan above" oninput="dUC()"></div><a id="df-stripe-link" href="#" target="_blank" style="display:none;font-size:11px;color:var(--pu);margin-top:4px;text-decoration:none">↗ View in Stripe</a></div>
+        <div class="fg"><label>Units sold</label><input id="df-units" type="number" placeholder="1" value="1" min="1"></div>
+      </div>
     </div>
-    <div class="fs">Sale details</div>
-    <div class="r2" style="margin-bottom:12px">
-      <div class="fg"><label>Sale Total ($)</label><div class="pfx"><span>$</span><input id="df-st" type="number" placeholder="Total deal value" oninput="dFC()"></div></div>
-      <div class="fg"><label>Units sold</label><input id="df-units" type="number" placeholder="1" value="1" min="1"></div>
+
+    <div id="dt-otf-section" style="display:none">
+      <div class="fs">One-time fee</div>
+      <div class="r2" style="margin-bottom:12px">
+        <div class="fg"><label>Amount *</label><div class="pfx"><span>$</span><input id="df-f" type="number" placeholder="e.g. 499" oninput="dUCB()"></div></div>
+        <div class="fg"><label>Description</label><input id="df-fd" placeholder="Website launch fee" value="Website launch fee"></div>
+      </div>
     </div>
+
     <div class="r2" style="margin-bottom:12px">
-      <div class="fg"><label>One-time fee <span style="font-size:10px;color:var(--mu)">(optional)</span></label><div class="pfx"><span>$</span><input id="df-f" type="number" placeholder="e.g. 259" oninput="dFC()"></div></div>
-      <div class="fg"><label>Fee description</label><input id="df-fd" value="Website launch fee"></div>
-    </div>
-    <div class="r2" style="margin-bottom:12px">
-      <div class="fg"><label>Subscription $/mo <span style="font-size:10px;color:var(--mu)">(auto-filled from plan)</span></label><div class="pfx"><span>$</span><input id="df-mrr" type="number" placeholder="Select a plan above" oninput="dUC()"></div><a id="df-stripe-link" href="#" target="_blank" style="display:none;font-size:11px;color:var(--pu);margin-top:4px;text-decoration:none">↗ View in Stripe</a></div>
-      <div class="fg"><label style="opacity:0">.</label><div style="font-size:11px;color:var(--mu);padding-top:28px">Charged directly in Stripe — not collected here</div></div>
+      <div class="fg"><label>Sale Total ($) <span style="font-size:10px;color:var(--mu)">(optional override)</span></label><div class="pfx"><span>$</span><input id="df-st" type="number" placeholder="Auto-calculated" oninput="dUC()"></div></div>
     </div>
     <div class="fs">Commission (auto-calculated)</div>
-    <div class="cbox"><div><div class="cl">Commission owed to lead source</div><div class="cc" id="df-cc">Select lead source and product</div></div><div class="cv" id="df-cv">—</div></div>
+    <div class="cbox"><div><div class="cl">Commission owed to lead source</div><div class="cc" id="df-cc">No lead source — no commission</div></div><div class="cv" id="df-cv">—</div></div>
     <div class="fs">Notes</div>
     <div class="fg"><textarea id="df-nt" placeholder="Special terms or context..."></textarea></div>
     <div class="fs">Collect payment</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
       <button class="pab" id="pa-card" onclick="dSPA('card')"><div class="patp"><div class="pai" id="pi-card"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="12" height="8" rx="1.5"/><path d="M1 6.5h12"/></svg></div><div class="pat">Take payment now</div></div><div class="pad">Rep enters card on the call</div></button>
-      <button class="pab" id="pa-link" onclick="dSPA('link')"><div class="patp"><div class="pai" id="pi-link"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5.5 8.5a3 3 0 0 0 4.24 0l2-2a3 3 0 0 0-4.24-4.24l-1 1"/><path d="M8.5 5.5a3 3 0 0 0-4.24 0l-2 2a3 3 0 0 0 4.24 4.24l1-1"/></svg></div><div class="pat">Send payment link</div></div><div class="pad">Customer pays via Stripe checkout</div></button>
+      <button class="pab" id="pa-link" onclick="dSPA('link')"><div class="patp"><div class="pai" id="pi-link"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5.5 8.5a3 3 0 0 0 4.24 0l2-2a3 3 0 0 0-4.24-4.24l-1 1"/><path d="M8.5 5.5a3 3 0 0 0-4.24 0l-2 2a3 3 0 0 0 4.24 4.24l1-1"/></svg></div><div class="pat">Send payment link</div></div><div class="pad">Customer pays via email</div></button>
     </div>
-    <div class="ppan" id="pp-inv" style="display:none"></div>
     <div class="ppan" id="pp-card">
       <div class="sbdg"><span class="spl">stripe</span>Card details processed securely — never stored here</div>
-      <div class="ctog"><button class="ct2 on" id="ct-dep" onclick="dSCC('deposit')">One-time fee</button><button class="ct2" id="ct-sub" onclick="dSCC('sub')">Subscription only</button><button class="ct2" id="ct-both" onclick="dSCC('both')">Both</button></div>
-      <div class="cbd" id="d-cb"><div class="cbr"><span>One-time fee</span><span class="cbv">—</span></div><div class="cbt"><span>Charging now</span><span class="cbtv">—</span></div></div>
+      <div class="cbd" id="d-cb"><div class="cbt"><span>Charging now</span><span class="cbtv">—</span></div></div>
       <div id="sel"></div>
       <div id="serr" style="color:var(--rd);font-size:12px;margin-top:5px"></div>
       <div class="sbox" id="psuc"><div class="sic">✓</div><div><div style="font-size:13px;font-weight:500;color:var(--gn)">Payment successful</div><div style="font-size:11px;color:var(--gn)" id="pref"></div></div></div>
     </div>
     <div class="ppan" id="pp-link">
-      <div style="font-size:12px;color:var(--mu);margin-bottom:10px">The correct Stripe payment link will be emailed to the customer automatically when you save the deal.</div>
-      <div class="fg"><label>Customer email <span style="font-size:10px;color:var(--mu)">(auto-filled from above)</span></label><input id="link-to" type="email" placeholder="customer@email.com"></div>
+      <div style="font-size:12px;color:var(--mu);margin-bottom:10px">A payment link will be emailed to the customer automatically.</div>
+      <div class="fg"><label>Customer email</label><input id="link-to" type="email" placeholder="customer@email.com"></div>
     </div>
-    <div class="mf" id="df"><button class="btn" onclick="cM()">Cancel</button><button class="btn btn-p" id="dsave" onclick="saveDeal()">Save deal — stage 1</button></div>`);
+    <div class="mf" id="df"><button class="btn" onclick="cM()">Cancel</button><button class="btn btn-p" id="dsave" onclick="saveDeal()">Save deal</button></div>`);
+}
+
+function dSetType(t){
+  dType=t;dPlan=null;dMrr=0;cardEl=null;dPA=null;
+  document.querySelectorAll('#dt-sub,#dt-otf').forEach(b=>b.classList.remove('on'));
+  ['dti-sub','dti-otf'].forEach(id=>{const el=document.getElementById(id);if(el){el.style.background='';el.style.color='';}});
+  document.getElementById('dt-'+t).classList.add('on');
+  document.getElementById('dti-'+t).style.background='var(--pu)';
+  document.getElementById('dti-'+t).style.color='#fff';
+  document.getElementById('dt-sub-section').style.display=t==='sub'?'':'none';
+  document.getElementById('dt-otf-section').style.display=t==='otf'?'':'none';
+  dCC=t==='sub'?'sub':'deposit';
+  // reset payment panels
+  document.querySelectorAll('.pab').forEach(b=>b.classList.remove('on'));
+  ['pi-card','pi-link'].forEach(id=>{const el=document.getElementById(id);if(el){el.style.background='';el.style.color='';}});
+  document.querySelectorAll('.ppan').forEach(p=>p.classList.remove('show'));
+  dUCB();
 }
 
 const STRIPE_PRICE_LINKS={DISCOVER:'https://dashboard.stripe.com/prices/price_1ShamzJdCDYxERimazBbXFQM',BOOST:'https://dashboard.stripe.com/prices/price_1Sf2b9JdCDYxERimXLjtfVYq',DOMINATE:'https://dashboard.stripe.com/prices/price_1SmiAOJdCDYxERimC2HsmRW7'};
-function dSP(el,plan,mrr){document.querySelectorAll('.pc').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');dPlan=plan;dMrr=mrr;const mrrEl=document.getElementById('df-mrr');if(mrrEl)mrrEl.value=mrr;const stEl=document.getElementById('df-st');if(stEl&&!stEl.value)stEl.value=mrr;const unitsEl=document.getElementById('df-units');if(unitsEl&&!unitsEl.value)unitsEl.value=1;const lnk=document.getElementById('df-stripe-link');if(lnk){lnk.href=STRIPE_PRICE_LINKS[plan]||'#';lnk.style.display='inline';}dUC();}
+function dSP(el,plan,mrr){document.querySelectorAll('.pc').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');dPlan=plan;dMrr=mrr;const mrrEl=document.getElementById('df-mrr');if(mrrEl)mrrEl.value=mrr;const stEl=document.getElementById('df-st');if(stEl&&!stEl.value)stEl.value=mrr;const lnk=document.getElementById('df-stripe-link');if(lnk){lnk.href=STRIPE_PRICE_LINKS[plan]||'#';lnk.style.display='inline';}dUC();}
 function dFC(){dUCB();}
-function dUC(){const sid=document.getElementById('df-s')?.value;const src=sid?db.sources.find(s=>s.id===sid):null;const iEl=document.getElementById('df-i');if(iEl)iEl.value=src?src.inc||'':'';const mrr=parseFloat(document.getElementById('df-mrr')?.value)||0;dMrr=mrr;const st=parseFloat(document.getElementById('df-st')?.value)||0;const base=st||mrr;const c=src&&base>0?(src.pr?src.pr.reduce((t,r)=>t+(r.t==='mrr'?base*(parseInt(r.q)||1):(parseFloat(r.a)||0)*(parseInt(r.q)||1)),0):base*2):0;const cvEl=document.getElementById('df-cv');if(cvEl)cvEl.textContent=src?(c>0?f$(c):'—'):'N/A (direct sale)';const ccEl=document.getElementById('df-cc');if(ccEl)ccEl.textContent=src?(src.inc||'Based on payout rules'):'No lead source — no commission';dUCB();}
-function dUCB(){const f=parseFloat(document.getElementById('df-f')?.value)||0;const mrr=parseFloat(document.getElementById('df-mrr')?.value)||0;const bd=document.getElementById('d-cb');if(!bd)return;let lines=[],tot=0;if(dCC==='deposit'||dCC==='both'){lines.push(['One-time fee',f]);tot+=f;}if(dCC==='sub'||dCC==='both'){lines.push([`${dPlan||'Plan'} subscription`,mrr]);tot+=mrr;}bd.innerHTML=lines.map(([k,v])=>`<div class="cbr"><span>${k}</span><span class="cbv">${f$(v)}</span></div>`).join('')+`<div class="cbt"><span>Charging now</span><span class="cbtv">${f$(tot)}</span></div>`;}
-function dSPA(t){dPA=t;document.querySelectorAll('.pab').forEach(b=>b.classList.remove('on'));['pi-inv','pi-card','pi-link'].forEach(id=>{const el=document.getElementById(id);if(el){el.style.background='';el.style.color='';}});document.getElementById('pa-'+t).classList.add('on');document.getElementById('pi-'+t).style.background='var(--pu)';document.getElementById('pi-'+t).style.color='#fff';document.querySelectorAll('.ppan').forEach(p=>p.classList.remove('show'));document.getElementById('pp-'+t).classList.add('show');if(t==='inv'){const ce=document.getElementById('df-ce')?.value;const invTo=document.getElementById('inv-to');if(invTo&&ce&&!invTo.value)invTo.value=ce;}if(t==='link'){const ce=document.getElementById('df-ce')?.value;const lt=document.getElementById('link-to');if(lt&&ce&&!lt.value)lt.value=ce;}if(t==='card')initSE();const sb=document.getElementById('dsave');if(sb)sb.textContent=t==='card'?'Charge & save deal':t==='link'?'Save deal & send payment link':'Send link & save deal';}
-function togCT(el){el.closest('.ctog').querySelectorAll('.ct2').forEach(c=>c.classList.remove('on'));el.classList.add('on');}
-function dSCC(t){dCC=t;document.querySelectorAll('#pp-card .ct2').forEach(c=>c.classList.remove('on'));document.getElementById('ct-'+t).classList.add('on');dUCB();}
-function initSE(){if(!stripe){document.getElementById('serr').textContent='Stripe not configured — paste your publishable key (pk_live_... or pk_test_...) in Settings';return;}
-  if(!cfg.spk||(!cfg.spk.startsWith('pk_live_')&&!cfg.spk.startsWith('pk_test_'))){document.getElementById('serr').textContent='Invalid Stripe key — make sure you\'re using the publishable key (starts with pk_live_ or pk_test_), not the secret key';return;}if(cardEl)return;const els=stripe.elements();cardEl=els.create('card',{style:{base:{fontFamily:'DM Sans,sans-serif',fontSize:'13px'}}});cardEl.mount('#sel');}
+function dUC(){const sid=document.getElementById('df-s')?.value;const src=sid?db.sources.find(s=>s.id===sid):null;const iEl=document.getElementById('df-i');if(iEl)iEl.value=src?src.inc||'':'';const mrr=parseFloat(document.getElementById('df-mrr')?.value)||0;dMrr=mrr;const f=parseFloat(document.getElementById('df-f')?.value)||0;const st=parseFloat(document.getElementById('df-st')?.value)||0;const base=dType==='sub'?(st||mrr):(st||f);const c=src&&base>0?(src.pr?src.pr.reduce((t,r)=>t+(r.t==='mrr'?base*(parseInt(r.q)||1):(parseFloat(r.a)||0)*(parseInt(r.q)||1)),0):base*2):0;const cvEl=document.getElementById('df-cv');if(cvEl)cvEl.textContent=src?(c>0?f$(c):'—'):'N/A (direct sale)';const ccEl=document.getElementById('df-cc');if(ccEl)ccEl.textContent=src?(src.inc||'Based on payout rules'):'No lead source — no commission';dUCB();}
+function dUCB(){const bd=document.getElementById('d-cb');if(!bd)return;let tot=0,label='';if(dType==='sub'){const mrr=parseFloat(document.getElementById('df-mrr')?.value)||0;tot=mrr;label=`${dPlan||'Plan'} subscription`;}else{const f=parseFloat(document.getElementById('df-f')?.value)||0;tot=f;label=document.getElementById('df-fd')?.value||'One-time fee';}bd.innerHTML=`<div class="cbr"><span>${label}</span><span class="cbv">${f$(tot)}</span></div><div class="cbt"><span>Charging now</span><span class="cbtv">${f$(tot)}</span></div>`;}
+function dSPA(t){dPA=t;document.querySelectorAll('.pab').forEach(b=>b.classList.remove('on'));['pi-card','pi-link'].forEach(id=>{const el=document.getElementById(id);if(el){el.style.background='';el.style.color='';}});document.getElementById('pa-'+t).classList.add('on');document.getElementById('pi-'+t).style.background='var(--pu)';document.getElementById('pi-'+t).style.color='#fff';document.querySelectorAll('.ppan').forEach(p=>p.classList.remove('show'));document.getElementById('pp-'+t).classList.add('show');if(t==='link'){const ce=document.getElementById('df-ce')?.value;const lt=document.getElementById('link-to');if(lt&&ce&&!lt.value)lt.value=ce;}if(t==='card')initSE();const sb=document.getElementById('dsave');if(sb)sb.textContent=t==='card'?'Charge & save deal':'Save deal & send payment link';}
+function dSCC(t){dCC=t;dUCB();}
+function initSE(){if(!stripe){document.getElementById('serr').textContent='Stripe not configured — paste your publishable key in Settings';return;}if(!cfg.spk||(!cfg.spk.startsWith('pk_live_')&&!cfg.spk.startsWith('pk_test_'))){document.getElementById('serr').textContent='Invalid Stripe key — use the publishable key (pk_live_... or pk_test_...)';return;}if(cardEl)return;const els=stripe.elements();cardEl=els.create('card',{style:{base:{fontFamily:'DM Sans,sans-serif',fontSize:'13px'}}});cardEl.mount('#sel');}
 
 async function saveDeal(){
   const cn=document.getElementById('df-cn')?.value.trim();
   if(!cn){alert('Business name required');return;}
-  if(!dPlan){alert('Select a product');return;}
+  if(dType==='sub'&&!dPlan){alert('Select a subscription plan');return;}
+  if(dType==='otf'&&!(parseFloat(document.getElementById('df-f')?.value)||0)){alert('Enter a one-time fee amount');return;}
   const ce=document.getElementById('df-ce')?.value.trim();
   if(!ce){alert('Customer email required');return;}
   const sid=document.getElementById('df-s')?.value||'';
@@ -793,46 +819,47 @@ async function saveDeal(){
   const saleTotal=parseFloat(document.getElementById('df-st')?.value)||0;
   const units=parseInt(document.getElementById('df-units')?.value)||1;
   dMrr=mrr;
-  const base=saleTotal||mrr;
+  const base=dType==='sub'?(saleTotal||mrr):(saleTotal||fee);
   const comm=src&&base>0?(src.pr?src.pr.reduce((t,r)=>t+(r.t==='mrr'?base*(parseInt(r.q)||1):(parseFloat(r.a)||0)*(parseInt(r.q)||1)),0):base*2):0;
-  const deal={id:nDid(),customer:cn,firstName:fn,lastName:ln,email:ce,phone:document.getElementById('df-cp')?.value||'',loc:document.getElementById('df-cl')?.value||'',plan:dPlan,mrr:mrr,units:units,saleTotal:saleTotal,commission:comm,srcId:sid,srcName:src?src.name:'Direct',rep:document.getElementById('df-r')?.value||'',date:document.getElementById('df-dt')?.value||td(),otf:fee,fd:document.getElementById('df-fd')?.value||'Website launch fee',ft:'',notes:document.getElementById('df-nt')?.value||'',stage:1,s1d:td(),s2d:'',s2u:'',s2b:'',s3d:'',s3a:0,s3r:'',s4d:'',s4a:0,s4m:'',s4r:'',s4ab:'',created:td()};
+  const deal={id:nDid(),customer:cn,firstName:fn,lastName:ln,email:ce,phone:document.getElementById('df-cp')?.value||'',loc:document.getElementById('df-cl')?.value||'',dealType:dType,plan:dType==='sub'?dPlan:null,mrr:dType==='sub'?mrr:0,units:units,saleTotal:saleTotal||base,commission:comm,srcId:sid,srcName:src?src.name:'Direct',rep:document.getElementById('df-r')?.value||'',date:document.getElementById('df-dt')?.value||td(),otf:dType==='otf'?fee:0,fd:document.getElementById('df-fd')?.value||'One-time fee',ft:'',notes:document.getElementById('df-nt')?.value||'',stage:1,s1d:td(),s2d:'',s2u:'',s2b:'',s3d:'',s3a:0,s3r:'',s4d:'',s4a:0,s4m:'',s4r:'',s4ab:'',created:td()};
   if(dPA==='card'&&cardEl&&stripe){
     const btn=document.getElementById('dsave');if(btn){btn.textContent='Processing...';btn.disabled=true;}
-    const h=Math.round(fee/2*100);
-    if(h<=0&&dCC==='deposit'){document.getElementById('serr').textContent='Amount is $0 — enter a one-time fee amount above';if(btn){btn.textContent='Charge & save deal';btn.disabled=false;}return;}
-    // Step 1: create PaymentIntent (deposit) or Subscription (sub/both) on server
     let pi;
-    if(dCC==='deposit'){
-      // One-time deposit charge only
-      pi=await api('charge',{amount:h,desc:`ZING — ${cn} ${dPlan} deposit`});
-    }else if(dCC==='sub'){
-      // Subscription only — no deposit
-      pi=await api('subscribe',{email:deal.email,name:cn,plan:dPlan,desc:`ZING ${dPlan}`});
+    if(dType==='otf'){
+      // One-time charge
+      const amt=Math.round(fee*100);
+      if(amt<=0){document.getElementById('serr').textContent='Amount is $0 — enter a fee amount above';if(btn){btn.textContent='Charge & save deal';btn.disabled=false;}return;}
+      pi=await api('charge',{amount:amt,desc:`ZING — ${cn}: ${deal.fd}`});
     }else{
-      // Both — deposit added to first subscription invoice by the server
-      pi=await api('subscribe',{email:deal.email,name:cn,plan:dPlan,depositAmount:h,desc:`${deal.fd} (50% deposit)`});
+      // Subscription
+      pi=await api('subscribe',{email:deal.email,name:cn,plan:dPlan,desc:`ZING ${dPlan}`});
     }
-    if(!pi||!pi.clientSecret){document.getElementById('serr').textContent='Payment failed: '+(pi?.err||pi?.error||'No response from Apps Script — check Settings URL');if(btn){btn.textContent='Charge & save deal';btn.disabled=false;}return;}
-    // Step 2: confirm card in browser (handles 3DS automatically)
+    if(!pi||!pi.clientSecret){document.getElementById('serr').textContent='Payment failed: '+(pi?.err||pi?.error||'Server error — check Settings');if(btn){btn.textContent='Charge & save deal';btn.disabled=false;}return;}
     const{paymentIntent,error}=await stripe.confirmCardPayment(pi.clientSecret,{payment_method:{card:cardEl}});
     if(error){document.getElementById('serr').textContent='Payment failed: '+error.message;if(btn){btn.textContent='Charge & save deal';btn.disabled=false;}return;}
     if(paymentIntent&&paymentIntent.status==='succeeded'){
-      const ca=dCC==='deposit'?h:dCC==='sub'?Math.round(dMrr*100):h+Math.round(dMrr*100);
-      deal.s3a=ca/100;deal.s3r=paymentIntent.id;
+      deal.s3a=paymentIntent.amount/100;deal.s3r=paymentIntent.id;
       if(pi.subscriptionId)deal.notes=(deal.notes?deal.notes+' | ':'')+'SubID: '+pi.subscriptionId;
       document.getElementById('psuc').classList.add('show');document.getElementById('pref').textContent=`Stripe ref: ${paymentIntent.id}${pi.subscriptionId?' · Sub: '+pi.subscriptionId:''}`;
-    }
-    else{document.getElementById('serr').textContent='Payment failed: status '+paymentIntent?.status;if(btn){btn.textContent='Charge & save deal';btn.disabled=false;}return;}
+    }else{document.getElementById('serr').textContent='Payment failed: status '+paymentIntent?.status;if(btn){btn.textContent='Charge & save deal';btn.disabled=false;}return;}
   }else if(dPA==='link'){
     const le=document.getElementById('link-to')?.value;
     if(!le){alert('Enter customer email to send payment link');return;}
-    if(!dPlan){alert('Select a product plan first');return;}
+    if(dType==='sub'&&!dPlan){alert('Select a subscription plan first');return;}
     const btn=document.getElementById('dsave');
     if(btn){if(btn._sending)return;btn._sending=true;btn.disabled=true;btn.style.opacity='0.6';btn.textContent='Sending link...';}
     try{
-      const lr=await api('sendPayLink',{cn,ce:le,plan:dPlan});
+      let lr;
+      if(dType==='sub'){
+        // Send Stripe payment link for the plan
+        lr=await api('sendPayLink',{cn,ce:le,plan:dPlan});
+      }else{
+        // OTF — create and send a Stripe invoice for the amount
+        lr=await api('stripeInv',{cn,ce:le,lines:[{d:deal.fd,q:1,a:fee}]});
+        if(lr?.id)lr={ok:true,url:lr.hosted_invoice_url||''};
+      }
       if(lr?.ok){
-        deal.paymentLink=lr.url;
+        deal.paymentLink=lr.url||'';
         if(btn){btn.style.background='#16a34a';btn.style.opacity='1';btn.textContent='✓ Payment link sent!';}
         db.deals.push(deal);dPlan=null;dMrr=0;dFT='';dPA=null;cardEl=null;
         api('saveDeal',{deal});sL();
@@ -840,7 +867,7 @@ async function saveDeal(){
         return;
       }else{
         if(btn){btn._sending=false;btn.disabled=false;btn.style.opacity='';btn.textContent='Save deal & send payment link';}
-        toast('Could not send payment link — '+( lr?.err||'unknown error'));return;
+        toast('Could not send payment link — '+(lr?.err||'unknown error'));return;
       }
     }catch(err){
       if(btn){btn._sending=false;btn.disabled=false;btn.style.opacity='';btn.textContent='Save deal & send payment link';}
@@ -851,14 +878,8 @@ async function saveDeal(){
     if(ie){
       const btn=document.getElementById('dsave');
       if(btn){if(btn._sending)return;btn._sending=true;btn.disabled=true;btn.style.opacity='0.6';btn.textContent='Sending invoice...';}
-      const selOpt=document.querySelector('#pp-inv .ct2.on')?.textContent?.trim()||'Deposit only';
-      let lines;
-      if(selOpt==='Full fee')lines=[{d:deal.fd,q:1,a:fee}];
-      else if(selOpt==='Sub + deposit')lines=[{d:dPlan+' subscription',q:1,a:dMrr},{d:deal.fd+' (50% deposit)',q:1,a:fee/2}];
-      else if(selOpt==='Everything')lines=[{d:dPlan+' subscription',q:1,a:dMrr},{d:deal.fd,q:1,a:fee}];
-      else lines=[{d:deal.fd+' (50% deposit)',q:1,a:fee/2}];
       try{
-        const ir=await api('stripeInv',{cn,ce:ie,lines,due:document.getElementById('inv-due')?.value});
+        const ir=await api('stripeInv',{cn,ce:ie,lines:[{d:deal.fd,q:1,a:fee}]});
         if(ir?.id){deal.sInvId=ir.id;}
         if(btn){btn.style.background='#16a34a';btn.style.opacity='1';btn.textContent='✓ Invoice sent!';}
       }catch(err){

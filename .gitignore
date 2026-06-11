@@ -1,1 +1,8 @@
 .env
+# Backend lives in Apps Script (contains live Stripe secret).
+# Deployed via clasp; do not commit to git.
+apps-script.gs
+Code.js
+appsscript.json
+.clasp.json
+.claspignore

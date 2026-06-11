@@ -99,6 +99,8 @@ tbody tr:hover td{background:#FAFAF8}
 .ssv{font-size:13px;font-weight:500;margin-top:1px}
 label{display:block;font-size:11px;font-weight:500;color:var(--mu);margin-bottom:5px}
 input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--bm);border-radius:var(--r);background:var(--su);color:var(--tx);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color .12s}
+input[type=checkbox],input[type=radio]{width:auto;padding:0;cursor:pointer}
+input[type=file]{padding:6px 8px;background:var(--bg)}
 input:focus,select:focus,textarea:focus{border-color:var(--pu);box-shadow:0 0 0 3px rgba(100,7,250,.08)}
 input[readonly]{background:var(--bg);color:var(--mu);cursor:default}
 textarea{resize:vertical;min-height:64px}
@@ -468,7 +470,7 @@ function rPipe(c,tr){
 }
 
 function rPay(c,tr){
-  tr.innerHTML=`<button class="btn btn-sm" onclick="xCSV('pay')">↓ CSV</button>`;
+  tr.innerHTML=`<button class="btn btn-p btn-sm" onclick="addSrc()">+ Add new partner</button><button class="btn btn-sm" onclick="xCSV('pay')">↓ CSV</button>`;
   const pd=db.deals.filter(d=>d.stage===4);
   const ow=db.deals.filter(d=>d.stage===3);
   const tp=pd.reduce((s,d)=>s+(d.s4a||0),0);
@@ -581,39 +583,117 @@ function editSrc(id){cM();setTimeout(()=>{pRC=0;srcForm(id);},100);}
 function srcForm(id){
   const s=id?db.sources.find(x=>x.id===id):null;
   const v=(f,d='')=>s?(s[f]||''):d;
-  oM(s?'Edit referral partner':'Add referral partner',`
-    <div class="fs" style="border-top:none;padding-top:0">Identity & contact</div>
-    <div class="r2"><div class="fg"><label>Legal business name *</label><input id="sf-n" value="${v('name')}" placeholder="Acme Partners LLC"></div>
-    <div class="fg"><label>Primary contact *</label><input id="sf-c" value="${v('contact')}" placeholder="Jane Smith"></div></div>
+  const isNew=!s;
+  // Generate referral code for new partners; preserve existing for edits.
+  const seedCode=v('refCode')||('PTR-'+Math.random().toString(36).slice(2,8).toUpperCase());
+  const seedLink=v('refLink')||`https://zing.work/?ref=${seedCode}`;
+  const hasLegacyPR=s&&Array.isArray(s.pr)&&s.pr.length>0;
+  // Status options: new partners default to 'pending'. Legacy values (Active/Inactive/Pending) preserved on edit.
+  const statusOpt=(val,label)=>`<option value="${val}" ${(v('status',isNew?'pending':'')||'').toLowerCase()===val?'selected':''}>${label}</option>`;
+  oM(s?'Edit partner':'New partner',`
+    <div class="fs" style="border-top:none;padding-top:0">Partner details</div>
+    <div class="r2"><div class="fg"><label>Full legal name *</label><input id="sf-n" value="${v('name')}" placeholder="Jane Smith" oninput="sfAhSync()"><div style="font-size:11px;color:var(--mu);margin-top:3px">Must match bank account holder name</div></div>
+    <div class="fg"><label>Company name (optional)</label><input id="sf-co" value="${v('company')}" placeholder="Acme Partners LLC"></div></div>
     <div class="r2"><div class="fg"><label>Email *</label><input id="sf-e" type="email" value="${v('email')}" placeholder="jane@acme.com"></div>
-    <div class="fg"><label>Phone</label><input id="sf-p" value="${v('phone')}" placeholder="303-555-0100"></div></div>
-    <div class="fg"><label>Street address</label><input id="sf-a1" value="${v('addr1')}" placeholder="123 Main St"></div>
-    <div class="r3"><div class="fg"><label>City / Suburb</label><input id="sf-a2" value="${v('city')}" placeholder="Denver"></div>
-    <div class="fg"><label>State</label><input id="sf-a3" value="${v('state')}" placeholder="CO"></div>
-    <div class="fg"><label>ZIP code</label><input id="sf-a4" value="${v('zip')}" placeholder="80202"></div></div>
-    <div class="r2"><div class="fg"><label>EIN / ABN</label><input id="sf-ein" value="${v('ein')}" placeholder="12-3456789"></div>
-    <div class="fg"><label>Status</label><select id="sf-st"><option ${v('status','Active')==='Active'?'selected':''}>Active</option><option ${v('status')==='Pending'?'selected':''}>Pending</option><option ${v('status')==='Inactive'?'selected':''}>Inactive</option></select></div></div>
-    <div class="fs">Banking & payout</div>
-    <div class="r2"><div class="fg"><label>Bank name</label><input id="sf-bk" value="${v('bank')}" placeholder="Chase"></div>
-    <div class="fg"><label>Account holder</label><input id="sf-ah" value="${v('ah')}" placeholder="Acme Partners LLC"></div></div>
-    <div class="r2"><div class="fg"><label>Account number</label><input id="sf-an" value="${v('an')}" placeholder="(masked after save)"></div>
-    <div class="fg"><label>Routing number (ABA)</label><input id="sf-rn" value="${v('rn')}" placeholder="021000021"></div></div>
-    <div class="r2"><div class="fg"><label>Account type</label><select id="sf-at"><option ${v('at','Business Checking')==='Business Checking'?'selected':''}>Business Checking</option><option ${v('at')==='Business Savings'?'selected':''}>Business Savings</option><option ${v('at')==='Personal Checking'?'selected':''}>Personal Checking</option></select></div>
-    <div class="fg"><label>Payout method</label><select id="sf-pm"><option ${v('pm','ACH')==='ACH'?'selected':''}>ACH</option><option ${v('pm')==='Wire Transfer'?'selected':''}>Wire Transfer</option><option ${v('pm')==='Check'?'selected':''}>Check</option></select></div></div>
-    <div class="fs">Payout rules</div>
-    <div class="prc"><div style="font-size:10px;font-weight:500;color:var(--mu);text-transform:uppercase;letter-spacing:.4px">Payout type</div><div style="font-size:10px;font-weight:500;color:var(--mu);text-transform:uppercase;letter-spacing:.4px">Qty</div><div style="font-size:10px;font-weight:500;color:var(--mu);text-transform:uppercase;letter-spacing:.4px">Amount</div></div>
-    <div id="prws"></div>
-    <button class="ar" id="arb" onclick="addPR()">+ Add rule</button>
-    <div class="r2" style="margin-top:12px"><div class="fg"><label>Payout trigger</label><select id="sf-trig"><option ${v('trig','Publishing fee collected')==='Publishing fee collected'?'selected':''}>Publishing fee collected</option><option ${v('trig')==='Customer active 30 days'?'selected':''}>Customer active 30 days</option><option ${v('trig')==='Manual approval'?'selected':''}>Manual approval</option></select></div>
-    <div class="fg"><label>Payment terms</label><select id="sf-trm"><option ${v('terms','Net 30')==='Net 30'?'selected':''}>Net 30</option><option ${v('terms')==='Net 14'?'selected':''}>Net 14</option><option ${v('terms')==='Net 60'?'selected':''}>Net 60</option></select></div></div>
-    <div class="r2"><div class="fg"><label>Agreement ref</label><input id="sf-ar" value="${v('aref')}" placeholder="RP-2025-XXX"></div>
-    <div class="fg"><label>Signed date</label><input id="sf-sd" type="date" value="${v('sd')}"></div></div>
-    <div class="r2"><div class="fg"><label>Program type</label><select id="sf-ty"><option ${v('type','Referral Partner')==='Referral Partner'?'selected':''}>Referral Partner</option><option ${v('type')==='Channel Partner'?'selected':''}>Channel Partner</option><option ${v('type')==='Enterprise Reseller'?'selected':''}>Enterprise Reseller</option><option ${v('type')==='Strategic Partner'?'selected':''}>Strategic Partner</option></select></div>
-    <div class="fg"><label>ZING owner</label><input id="sf-ow" value="${v('owner','Amy Bourke')}"></div></div>
+    <div class="fg"><label>Mobile phone *</label><input id="sf-mp" value="${v('mphone')}" placeholder="303-555-0100"></div></div>
+    <div class="r2"><div class="fg"><label>Work / landline phone</label><input id="sf-p" value="${v('phone')}" placeholder="optional"></div>
+    <div class="fg"><label>EIN (if company)</label><input id="sf-ein" value="${v('ein')}" placeholder="12-3456789"><div style="font-size:11px;color:var(--mu);margin-top:3px">SSN is collected via W-9 only — never typed here</div></div></div>
+    <div class="fs">Business address</div>
+    <div class="fg"><label>Street address *</label><input id="sf-a1" value="${v('addr1')}" placeholder="123 Main St"></div>
+    <div class="r3"><div class="fg"><label>City *</label><input id="sf-a2" value="${v('city')}" placeholder="Denver"></div>
+    <div class="fg"><label>State *</label><input id="sf-a3" value="${v('state')}" placeholder="CO"></div>
+    <div class="fg"><label>ZIP code *</label><input id="sf-a4" value="${v('zip')}" placeholder="80202"></div></div>
+    <div class="fs">Bank details (US only)</div>
+    <div class="r2"><div class="fg"><label>Account holder name *</label><input id="sf-ah" value="${v('ah')||v('name')}" placeholder="pre-filled from legal name"></div>
+    <div class="fg"><label>Bank name *</label><input id="sf-bk" value="${v('bank')}" placeholder="Chase"></div></div>
+    <div class="r2"><div class="fg"><label>Routing number (9 digits) *</label><input id="sf-rn" value="${v('rn')}" placeholder="021000021" inputmode="numeric" maxlength="9" oninput="sfRnValidate()"><div id="sf-rn-msg" style="font-size:11px;margin-top:3px;color:var(--mu)">9 digits, ABA checksum validated</div></div>
+    <div class="fg"><label>Account type *</label><select id="sf-at"><option value="Checking" ${(v('at')||'Checking')==='Checking'?'selected':''}>Checking</option><option value="Savings" ${v('at')==='Savings'?'selected':''}>Savings</option></select></div></div>
+    <div class="r2"><div class="fg"><label>Account number *</label><input id="sf-an" value="${v('an')}" placeholder="(masked after save)"></div>
+    <div class="fg"><label>Confirm account number *</label><input id="sf-an2" placeholder="re-type to confirm" onpaste="return false" oncopy="return false" oncut="return false" autocomplete="off" oninput="sfAnValidate()"><div id="sf-an2-msg" style="font-size:11px;margin-top:3px;color:var(--mu)">Paste disabled — must be retyped</div></div></div>
+    <div class="fs">Tax</div>
+    <div class="fg"><label>W-9 upload (PDF) ${v('w9FileId')?'<span class="badge bg" style="margin-left:8px">on file</span>':'<span class="badge ba" style="margin-left:8px">pending</span>'}</label>
+      <input id="sf-w9" type="file" accept="application/pdf,image/png,image/jpeg" style="font-size:13px">
+      <div style="font-size:11px;color:var(--mu);margin-top:3px">${v('w9Filename')?'Current: '+v('w9Filename')+' — ':''}Required before first payout. Stored in Drive folder shared with partners@zing-work.com.</div>
+    </div>
+    <div class="fs">Commission deal</div>
+    <div class="r2"><div class="fg"><label>Commission type *</label><select id="sf-comty" onchange="sfComSync()"><option value="mrr" ${(v('comType')||'mrr')==='mrr'?'selected':''}>% of MRR</option><option value="otf" ${v('comType')==='otf'?'selected':''}>One-time fee</option><option value="both" ${v('comType')==='both'?'selected':''}>Both</option></select></div>
+    <div class="fg"><label>MRR duration</label><select id="sf-mrrdur"><option value="lifetime" ${(v('mrrDur')||'lifetime')==='lifetime'?'selected':''}>Lifetime</option><option value="12mo" ${v('mrrDur')==='12mo'?'selected':''}>12 months</option><option value="24mo" ${v('mrrDur')==='24mo'?'selected':''}>24 months</option></select></div></div>
+    <div class="r2"><div class="fg sf-com-mrr"><label>MRR commission %</label><div class="pfx"><input id="sf-mrrpct" type="number" min="0" max="100" step="0.5" value="${v('mrrPct')||'20'}"><span style="padding-left:6px">%</span></div></div>
+    <div class="fg sf-com-otf"><label>One-time fee</label><div class="pfx"><select id="sf-otfty" style="flex:0 0 auto;width:90px;margin-right:6px"><option value="flat" ${(v('otfType')||'flat')==='flat'?'selected':''}>$</option><option value="pct" ${v('otfType')==='pct'?'selected':''}>% of launch</option></select><input id="sf-otfa" type="number" min="0" step="1" value="${v('otfAmt')||''}" placeholder="e.g. 250"></div></div></div>
+    <div class="r2"><div class="fg"><label>Payout schedule</label><select id="sf-paysch"><option value="monthly" ${(v('paySched')||'monthly')==='monthly'?'selected':''}>Monthly</option><option value="net30" ${v('paySched')==='net30'?'selected':''}>Net 30</option></select></div>
+    <div class="fg"><label>Clawback window</label><select id="sf-claw"><option value="60" ${(v('clawback')||'60')==='60'?'selected':''}>60 days</option><option value="90" ${v('clawback')==='90'?'selected':''}>90 days</option></select></div></div>
+    <div class="r2"><div class="fg"><label>Payout trigger</label><select id="sf-trig"><option value="first_invoice_paid" ${(v('payTrig')||v('trig')||'first_invoice_paid')==='first_invoice_paid'?'selected':''}>Customer pays first invoice</option><option value="manual" ${(v('payTrig')||v('trig'))==='manual'?'selected':''}>Manual approval</option></select></div>
+    <div class="fg"><label>Payment method</label><select id="sf-pm"><option ${(v('pm')||'ACH')==='ACH'?'selected':''}>ACH</option><option ${v('pm')==='Wire Transfer'?'selected':''}>Wire Transfer</option><option ${v('pm')==='Check'?'selected':''}>Check</option></select></div></div>
+    <div class="fs">Tracking</div>
+    <div class="r2"><div class="fg"><label>Referral code</label><input id="sf-refc" value="${seedCode}" oninput="sfRefSync()"></div>
+    <div class="fg"><label>Tracking link</label><input id="sf-refl" value="${seedLink}" readonly style="background:var(--bg);color:var(--mu);font-family:'DM Mono',monospace;font-size:12px"></div></div>
+    <div class="fs">Admin (internal)</div>
+    <div class="r2"><div class="fg"><label>Status</label><select id="sf-st">${statusOpt('pending','Pending')}${statusOpt('approved','Approved')}${statusOpt('active','Active')}${statusOpt('paused','Paused')}${s&&!['pending','approved','active','paused'].includes((v('status')||'').toLowerCase())?`<option selected>${v('status')}</option>`:''}</select></div>
+    <div class="fg"><label>Program type</label><select id="sf-ty"><option ${(v('type')||'Referral Partner')==='Referral Partner'?'selected':''}>Referral Partner</option><option ${v('type')==='Channel Partner'?'selected':''}>Channel Partner</option><option ${v('type')==='Enterprise Reseller'?'selected':''}>Enterprise Reseller</option><option ${v('type')==='Strategic Partner'?'selected':''}>Strategic Partner</option></select></div></div>
+    <div class="r2"><div class="fg"><label>Agreement signed date</label><input id="sf-sd" type="date" value="${v('sd')}"></div>
+    <div class="fg"><label>Agreement ref</label><input id="sf-ar" value="${v('aref')}" placeholder="RP-2026-XXX"></div></div>
+    <div class="r2"><div class="fg"><label>ZING owner</label><input id="sf-ow" value="${v('owner','Amy Bourke')}"></div>
+    <div class="fg"><label>Primary contact (if company)</label><input id="sf-c" value="${v('contact')}" placeholder="same as legal name if individual"></div></div>
     <div class="fg"><label>Notes</label><textarea id="sf-nt">${v('notes')}</textarea></div>
-    <div class="mf"><button class="btn" onclick="cM()">Cancel</button><button class="btn btn-p" onclick="saveSrc('${id||''}')">Save referral partner</button></div>`);
-  const ex=s&&s.pr&&s.pr.length?s.pr:[{t:'mrr',q:'2',a:''}];
-  ex.forEach((r,i)=>addPR(r,i));
+    ${hasLegacyPR?`<div class="fs">Legacy payout rules</div>
+    <div style="font-size:11px;color:var(--mu);margin-bottom:8px">Read-only — retained from previous form. Active commission is set in the section above.</div>
+    <div class="prc"><div style="font-size:10px;font-weight:500;color:var(--mu);text-transform:uppercase;letter-spacing:.4px">Payout type</div><div style="font-size:10px;font-weight:500;color:var(--mu);text-transform:uppercase;letter-spacing:.4px">Qty</div><div style="font-size:10px;font-weight:500;color:var(--mu);text-transform:uppercase;letter-spacing:.4px">Amount</div></div>
+    <div id="prws"></div>`:''}
+    <div class="fg" style="margin-top:16px;padding:12px;background:var(--bg);border-radius:var(--r);border:1px solid var(--bm)">
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin:0">
+        <input id="sf-agr" type="checkbox" ${v('agreed')?'checked':''} style="margin-top:3px;flex:0 0 auto;width:18px;height:18px;padding:0">
+        <span style="font-size:13px;line-height:1.5;color:var(--ox)">I agree to the <a href="#" onclick="return false" style="color:var(--pu)">ZING Partner Agreement</a> and consent to receive partner communications (email/SMS) from ZING.</span>
+      </label>
+    </div>
+    <div class="mf"><button class="btn" onclick="cM()">Cancel</button><button class="btn btn-p" onclick="saveSrc('${id||''}')">Save partner</button></div>`);
+  if(hasLegacyPR){
+    s.pr.forEach((r,i)=>addPR(r,i));
+    // Lock legacy PR rows read-only
+    setTimeout(()=>{document.querySelectorAll('#prws select,#prws input,#prws .rm,#arb').forEach(el=>{el.disabled=true;el.style.opacity='.55';if(el.classList.contains('rm')||el.id==='arb')el.style.display='none';});},10);
+  }
+  sfComSync();
+}
+
+// ── form helpers (added 2026-06-11) ──
+// Auto-mirror legal name → account holder if user hasn't typed in account holder yet
+function sfAhSync(){
+  const n=document.getElementById('sf-n'),ah=document.getElementById('sf-ah');
+  if(!n||!ah)return;
+  if(!ah.dataset.touched)ah.value=n.value;
+}
+// Toggle MRR % / OTF amount visibility based on commission type
+function sfComSync(){
+  const t=document.getElementById('sf-comty')?.value||'mrr';
+  document.querySelectorAll('.sf-com-mrr').forEach(el=>el.style.display=(t==='mrr'||t==='both')?'':'none');
+  document.querySelectorAll('.sf-com-otf').forEach(el=>el.style.display=(t==='otf'||t==='both')?'':'none');
+  const mrrDur=document.getElementById('sf-mrrdur');
+  if(mrrDur)mrrDur.closest('.fg').style.display=(t==='mrr'||t==='both')?'':'none';
+}
+// Live ABA routing-number checksum: 3*(d1+d4+d7)+7*(d2+d5+d8)+(d3+d6+d9) mod 10 == 0
+function sfRnValid(rn){
+  if(!/^\d{9}$/.test(rn))return false;
+  const d=rn.split('').map(Number);
+  return (3*(d[0]+d[3]+d[6])+7*(d[1]+d[4]+d[7])+(d[2]+d[5]+d[8]))%10===0;
+}
+function sfRnValidate(){
+  const el=document.getElementById('sf-rn'),msg=document.getElementById('sf-rn-msg');if(!el||!msg)return;
+  const rn=el.value.trim();
+  if(!rn){msg.textContent='9 digits, ABA checksum validated';msg.style.color='var(--mu)';return;}
+  if(rn.length<9){msg.textContent=`${rn.length}/9 digits`;msg.style.color='var(--mu)';return;}
+  if(sfRnValid(rn)){msg.textContent='✓ valid routing number';msg.style.color='var(--gn,#16a34a)';}
+  else{msg.textContent='✗ invalid checksum — double-check the number';msg.style.color='#dc2626';}
+}
+function sfAnValidate(){
+  const a=document.getElementById('sf-an')?.value.trim()||'';
+  const b=document.getElementById('sf-an2')?.value.trim()||'';
+  const msg=document.getElementById('sf-an2-msg');if(!msg)return;
+  if(!b){msg.textContent='Paste disabled — must be retyped';msg.style.color='var(--mu)';return;}
+  if(a===b){msg.textContent='✓ accounts match';msg.style.color='var(--gn,#16a34a)';}
+  else{msg.textContent='✗ does not match';msg.style.color='#dc2626';}
+}
+function sfRefSync(){
+  const c=document.getElementById('sf-refc')?.value.trim()||'';
+  const l=document.getElementById('sf-refl');if(l)l.value=`https://zing.work/?ref=${encodeURIComponent(c)}`;
 }
 
 function addPR(d={},ix=null){
@@ -636,21 +716,114 @@ function getPR(){
   for(let i=0;i<pRC+5;i++){const t=document.getElementById(`prt-${i}`);if(!t)continue;const row=document.getElementById(`pr-${i}`);if(!row||row.style.display==='none')continue;r.push({t:t.value,q:document.getElementById(`prq-${i}`).value,a:document.getElementById(`pra-${i}`).value});}
   return r;
 }
-function saveSrc(id){
+async function saveSrc(id){
+  // Required identity
   const name=document.getElementById('sf-n').value.trim();
   const email=document.getElementById('sf-e').value.trim();
-  if(!name){alert('Business name required');return;}
-  const raw=document.getElementById('sf-an').value.trim();
-  const an=raw.startsWith('****')?raw:(raw.length>=4?'****'+raw.slice(-4):raw);
-  const pr=getPR();
-  const inc=pr.map(r=>`${r.q}x MRR`).join(' + ');
-  const a1=document.getElementById('sf-a1').value.trim(),a2=document.getElementById('sf-a2').value.trim(),a3=document.getElementById('sf-a3').value.trim(),a4=document.getElementById('sf-a4').value.trim();
+  const mphone=document.getElementById('sf-mp').value.trim();
+  if(!name){alert('Full legal name required');return;}
+  if(!email){alert('Email required');return;}
+  if(!mphone){alert('Mobile phone required');return;}
+  // Address
+  const a1=document.getElementById('sf-a1').value.trim();
+  const a2=document.getElementById('sf-a2').value.trim();
+  const a3=document.getElementById('sf-a3').value.trim();
+  const a4=document.getElementById('sf-a4').value.trim();
+  if(!a1||!a2||!a3||!a4){alert('Full business address required');return;}
+  // Bank: routing checksum + account match
+  const rn=document.getElementById('sf-rn').value.trim();
+  if(rn&&!sfRnValid(rn)){alert('Routing number is invalid (failed ABA checksum). Please re-check the 9 digits.');return;}
+  const rawAn=document.getElementById('sf-an').value.trim();
+  const an2=document.getElementById('sf-an2').value.trim();
+  if(rawAn&&!rawAn.startsWith('****')&&an2!==rawAn){alert('Account numbers do not match. Please re-type the confirmation.');return;}
+  // Consent
+  if(!document.getElementById('sf-agr').checked){alert('Please confirm agreement to the ZING Partner Agreement and comms consent.');return;}
+  // Mask account number after first save (legacy behavior)
+  const an=rawAn.startsWith('****')?rawAn:(rawAn.length>=4?'****'+rawAn.slice(-4):rawAn);
   const addr=[a1,a2,a3,a4].filter(Boolean).join(', ');
-  const data={name,email,contact:document.getElementById('sf-c').value,phone:document.getElementById('sf-p').value,addr1:a1,city:a2,state:a3,zip:a4,addr,ein:document.getElementById('sf-ein').value,status:document.getElementById('sf-st').value,bank:document.getElementById('sf-bk').value,ah:document.getElementById('sf-ah').value,an,rn:document.getElementById('sf-rn').value,at:document.getElementById('sf-at').value,pm:document.getElementById('sf-pm').value,type:document.getElementById('sf-ty').value,pr,inc,trig:document.getElementById('sf-trig').value,terms:document.getElementById('sf-trm').value,aref:document.getElementById('sf-ar').value,sd:document.getElementById('sf-sd').value,owner:document.getElementById('sf-ow').value,notes:document.getElementById('sf-nt').value};
+  // Preserve legacy pr if it exists, but no longer accept edits via this form.
+  const existing=id?db.sources.find(x=>x.id===id):null;
+  const pr=existing&&Array.isArray(existing.pr)?existing.pr:[];
+  // Build inc summary from new commission section for at-a-glance display in lists
+  const comType=document.getElementById('sf-comty').value;
+  const mrrPct=parseFloat(document.getElementById('sf-mrrpct')?.value)||0;
+  const mrrDur=document.getElementById('sf-mrrdur')?.value||'';
+  const otfType=document.getElementById('sf-otfty')?.value||'';
+  const otfAmt=parseFloat(document.getElementById('sf-otfa')?.value)||0;
+  const incParts=[];
+  if(comType==='mrr'||comType==='both')incParts.push(`${mrrPct}% MRR (${mrrDur})`);
+  if(comType==='otf'||comType==='both')incParts.push(otfType==='pct'?`${otfAmt}% of launch fee`:`$${otfAmt} one-time`);
+  const inc=incParts.join(' + ');
+  const data={
+    // Legacy fields kept for backward compat with deals/invoices code paths
+    name,email,contact:document.getElementById('sf-c').value,
+    phone:document.getElementById('sf-p').value,
+    addr1:a1,city:a2,state:a3,zip:a4,addr,
+    ein:document.getElementById('sf-ein').value,
+    status:document.getElementById('sf-st').value,
+    bank:document.getElementById('sf-bk').value,
+    ah:document.getElementById('sf-ah').value,
+    an,rn,
+    at:document.getElementById('sf-at').value,
+    pm:document.getElementById('sf-pm').value,
+    type:document.getElementById('sf-ty').value,
+    pr,inc,
+    trig:document.getElementById('sf-trig').value, // mirror payTrig into legacy `trig` for any existing consumers
+    terms:document.getElementById('sf-paysch').value==='net30'?'Net 30':'Monthly',
+    aref:document.getElementById('sf-ar').value,
+    sd:document.getElementById('sf-sd').value,
+    owner:document.getElementById('sf-ow').value,
+    notes:document.getElementById('sf-nt').value,
+    // New fields (2026-06-11)
+    mphone,
+    company:document.getElementById('sf-co').value,
+    comType,mrrPct,mrrDur,otfType,otfAmt,
+    payTrig:document.getElementById('sf-trig').value,
+    paySched:document.getElementById('sf-paysch').value,
+    clawback:document.getElementById('sf-claw').value,
+    refCode:document.getElementById('sf-refc').value.trim(),
+    refLink:document.getElementById('sf-refl').value.trim(),
+    agreed:true,
+    agreedAt:existing&&existing.agreedAt?existing.agreedAt:new Date().toISOString()
+  };
   pRC=0;
-  if(id){const ix=db.sources.findIndex(s=>s.id===id);db.sources[ix]={...db.sources[ix],...data};toast('Updated');}
-  else{db.sources.push({id:nSid(),...data,created:td()});toast('Lead source added');}
-  api('saveSrc',{src:id?db.sources.find(x=>x.id===id):db.sources[db.sources.length-1]});
+  let saved;
+  if(id){
+    const ix=db.sources.findIndex(s=>s.id===id);
+    // Preserve existing w9 fields unless replaced below
+    db.sources[ix]={...db.sources[ix],...data};
+    saved=db.sources[ix];
+    toast('Partner updated');
+  } else {
+    saved={id:nSid(),...data,created:td()};
+    db.sources.push(saved);
+    toast('Partner added — W-9 pending until uploaded');
+  }
+  // Handle W-9 upload (best-effort — don't block save if backend rejects)
+  const w9Input=document.getElementById('sf-w9');
+  const w9File=w9Input&&w9Input.files&&w9Input.files[0];
+  if(w9File){
+    try{
+      const b64=await new Promise((res,rej)=>{
+        const r=new FileReader();
+        r.onload=()=>res((r.result||'').toString().split(',')[1]||'');
+        r.onerror=rej;
+        r.readAsDataURL(w9File);
+      });
+      const up=await api('uploadW9',{srcId:saved.id,filename:w9File.name,mimeType:w9File.type||'application/pdf',base64:b64});
+      if(up&&up.ok){
+        saved.w9FileId=up.fileId;
+        saved.w9Filename=up.filename;
+        saved.w9UploadedAt=up.uploadedAt;
+        toast('W-9 uploaded to Drive');
+      } else if(up&&up.err){
+        toast('W-9 not uploaded: '+up.err);
+      }
+    }catch(e){
+      toast('W-9 upload failed — partner saved without W-9');
+    }
+  }
+  api('saveSrc',{src:saved});
   sL();cM();render();
 }
 

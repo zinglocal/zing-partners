@@ -226,6 +226,7 @@ code{background:var(--bg);border:1px solid var(--bo);border-radius:4px;padding:1
     <div class="ni" data-v="deals" onclick="nav('deals')"><svg class="nico" viewBox="0 0 14 14" fill="currentColor"><path d="M1 2.5h12v2H1zm0 4h9v2H1zm0 4h6v2H1z"/></svg>Deals</div>
     <div class="ni" data-v="pipe" onclick="nav('pipe')"><svg class="nico" viewBox="0 0 14 14" fill="currentColor"><rect x="0" y="5" width="2" height="7"/><rect x="4" y="3" width="2" height="9"/><rect x="8" y="6" width="2" height="6"/><rect x="12" y="1" width="2" height="11"/></svg>Pipeline</div>
     <div class="ni" data-v="pay" onclick="nav('pay')"><svg class="nico" viewBox="0 0 14 14" fill="currentColor"><rect x="0" y="3" width="14" height="9" rx="1.5"/><path d="M0 7h14M3 10h2M9 10h3"/></svg>Payments</div>
+    <div class="ni" data-v="ob" onclick="nav('ob')"><svg class="nico" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h10M2 7h10M2 11h10"/><circle cx="3.5" cy="3" r="1" fill="currentColor"/><circle cx="3.5" cy="7" r="1" fill="currentColor"/><circle cx="3.5" cy="11" r="1" fill="currentColor"/></svg>Onboarding</div>
     <div class="ni" data-v="inv" onclick="nav('inv')"><svg class="nico" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="1" width="10" height="12" rx="1"/><path d="M5 5h4M5 8h4M5 11h2"/></svg>Invoices</div>
     <div class="sb-ft"><div id="sbcnt">— sources · — deals</div><div style="margin-top:5px;cursor:pointer" onclick="openSettings()">⚙ Settings</div></div>
   </div>
@@ -248,7 +249,46 @@ const SCRIPT_URL='https://yourwebsiteexample.com/api/partner';
 const STRIPE_PK='pk_live_51MS2Z5JdCDYxERimgJ3xbxa3gaPsANikkzIJOLfB387z3EDNidKzhsJAcIAXxoAgNsNT0V7UZ69rqvKpI6SbfTnL00RMwCP6yt';
 const REPS=['Ryan','Elizabeth','Eric','Elliot','Caden','Jon','Zach','Jaime','Amy'];
 const SL=['','Deal sold','Site published','Fee collected','Partner paid'];
-let cfg={},db={sources:[],deals:[],invoices:[],ns:1,nd:1,ni:1};
+// Atlas-parity onboarding stages — same vocabulary, same colors so designers and contractors
+// share the language. Order = customer journey from raw deal → published.
+const WEBSITE_STAGES=[
+  {value:'not_started',label:'Not Started',color:'#ef4444'},
+  {value:'website-started',label:'Website Started',color:'#f59e0b'},
+  {value:'first-draft',label:'First Draft Ready',color:'#f59e0b'},
+  {value:'website-sent',label:'Website Sent',color:'#00AEFF'},
+  {value:'edits-mode',label:'Edits Mode',color:'#9600FF'},
+  {value:'ready-qa',label:'Ready for QA',color:'#8b5cf6'},
+  {value:'ready-publishing',label:'Ready for Publishing',color:'#06b6d4'},
+  {value:'complete',label:'Published',color:'#10b981'}
+];
+// Task taxonomy mirrors Atlas. Each plan auto-seeds a subset — leave others as 'n/a' so the
+// column shows '—' and isn't actionable. Contractors see only the rows that apply.
+const OB_TASKS=[
+  {key:'social_media_1pw',type:'social_media',name:'1 post per week',label:'Social Media 1PW'},
+  {key:'social_media_2pw',type:'social_media',name:'2 posts per week',label:'Social Media 2PW'},
+  {key:'bookings',type:'bookings',name:'Bookings',label:'Bookings'},
+  {key:'email_marketing',type:'email_marketing',name:'Email Marketing',label:'Email Marketing'},
+  {key:'ecommerce',type:'ecommerce',name:'Ecommerce',label:'Ecommerce'},
+  {key:'gbp',type:'gbp',name:'Google Business Profile',label:'GBP'},
+  {key:'directories',type:'directories',name:'Directories',label:'Directories'},
+  {key:'landing_50',type:'landing_pages',name:'50 landing pages',label:'Landing 50'},
+  {key:'landing_100',type:'landing_pages',name:'100 landing pages',label:'Landing 100'},
+  {key:'ai_chat',type:'ai_chat',name:'AI Chat',label:'AI Chat'},
+  {key:'ai_receptionist',type:'ai_receptionist',name:'AI Receptionist',label:'AI Receptionist'},
+  {key:'blogs_1pw',type:'blogs',name:'1 post per week',label:'Blogs 1PW'},
+  {key:'blogs_3m',type:'blogs',name:'3 month plan',label:'Blogs 3M'},
+  {key:'blogs_6m',type:'blogs',name:'6 month plan',label:'Blogs 6M'},
+  {key:'blogs_12m',type:'blogs',name:'12 month plan',label:'Blogs 12M'},
+  {key:'crm',type:'crm',name:'CRM',label:'CRM'}
+];
+// Default product → task allowlist. Plans not in this map seed an empty item list and
+// contractors flip 'n/a' → 'outstanding' manually on the row to activate a task.
+const PLAN_TASKS={
+  'DISCOVER':['gbp','directories','social_media_1pw','blogs_1pw'],
+  'BOOST':['gbp','directories','social_media_1pw','social_media_2pw','landing_50','blogs_1pw','blogs_3m','ai_chat'],
+  'DOMINATE':['gbp','directories','social_media_2pw','landing_50','landing_100','blogs_1pw','blogs_3m','blogs_6m','blogs_12m','ai_chat','ai_receptionist','email_marketing','bookings','crm','ecommerce']
+};
+let cfg={},db={sources:[],deals:[],invoices:[],onboardings:[],ns:1,nd:1,ni:1};
 let usr=localStorage.getItem('zing_user')||'';
 let stripe=null,cardEl=null;
 let dPlan=null,dMrr=0,dFT='split',dPA=null,dCC='deposit';
@@ -315,14 +355,14 @@ function setUsr(n){usr=n;localStorage.setItem('zing_user',n);updUsr();cM();toast
 function nav(v){
   view=v;
   document.querySelectorAll('.ni').forEach(el=>el.classList.toggle('on',el.dataset.v===v));
-  document.getElementById('pgtitle').textContent={dash:'Dashboard',src:'Referral Partner Set Up',deals:'Deals',pipe:'Pipeline',pay:'Payments',inv:'Invoices'}[v];
+  document.getElementById('pgtitle').textContent={dash:'Dashboard',src:'Referral Partner Set Up',deals:'Deals',pipe:'Pipeline',pay:'Payments',ob:'Onboarding',inv:'Invoices'}[v];
   render();
 }
 
 function render(){
   const c=document.getElementById('cnt'),tr=document.getElementById('tr');
   tr.innerHTML='';
-  ({dash:rDash,src:rSrc,deals:rDeals,pipe:rPipe,pay:rPay,inv:rInv})[view](c,tr);
+  ({dash:rDash,src:rSrc,deals:rDeals,pipe:rPipe,pay:rPay,ob:rOnboarding,inv:rInv})[view](c,tr);
   updCnt();
 }
 
@@ -492,6 +532,315 @@ function rPay(c,tr){
       <td>${d.s4m||''}</td><td class="mo">${d.s4r||''}</td><td>${d.s4ab||''}</td>
     </tr>`).join('')}</tbody>
   </table></div>`}</div>`;
+}
+
+// ── ONBOARDING (Atlas-style table) ──────────────────────────────────────────────────────────
+let obFilters={webStatus:'',rep:'',feeCollected:'',designBrief:'',domainType:'',googleAccess:'',gbp:'',directories:'',landing_50:'',landing_100:'',ai_chat:'',ai_receptionist:'',social_media_1pw:'',social_media_2pw:'',bookings:'',email_marketing:'',ecommerce:'',blogs_1pw:'',blogs_3m:'',blogs_6m:'',blogs_12m:'',crm:''};
+let obSearch='';
+let obNotesPanel=null;
+let obNotesDraft='';
+
+// Lookup helpers
+function obGetItem(ob,key){return (ob.items||[]).find(i=>i.key===key)||null;}
+function obItemStatus(ob,key){const it=obGetItem(ob,key);if(!it)return 'n/a';return it.status||'outstanding';}
+function obStageMeta(v){return WEBSITE_STAGES.find(s=>s.value===v)||WEBSITE_STAGES[0];}
+function obFmtDate(d){if(!d)return '—';const dt=new Date(d);if(isNaN(dt))return '—';return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+
+// Seed an onboarding row from a deal. Called when deal stage = 3 (Fee collected).
+function obSeedFromDeal(deal){
+  const src=db.sources.find(s=>s.id===deal.srcId);
+  const planKey=(deal.plan||'').toUpperCase().split(' ')[0];
+  const allowed=PLAN_TASKS[planKey]||[];
+  const items=OB_TASKS.map(t=>({
+    key:t.key,type:t.type,name:t.name,label:t.label,
+    status:allowed.includes(t.key)?'outstanding':'n/a',
+    dueDate:'',completedAt:'',owner:''
+  }));
+  return {
+    id:'OB-'+deal.id,
+    dealId:deal.id,
+    customerName:deal.customer||'',
+    businessName:deal.businessName||deal.customer||'',
+    email:deal.email||'',
+    phone:deal.phone||'',
+    websiteStatus:'not_started',
+    onboardingRep:'',
+    repNotes:[],
+    salesRep:deal.rep||'',
+    closeDate:deal.date||deal.s3d||'',
+    launchFeeAmount:deal.otf||0,
+    launchFeeCollected:(deal.s3a||0)>0?'yes':'no',
+    designBrief:'no',
+    domainType:'new',
+    domainName:'',
+    googleAccess:'no',
+    publishedUrl:'',
+    publishedDate:'',
+    publishedBy:'',
+    draftDueDate:'',
+    plan:planKey,
+    partnerSrcId:deal.srcId||'',
+    partnerName:src?src.name:'',
+    items,
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  };
+}
+
+// Ensure an onboarding row exists for a deal at the moment it reaches stage 3.
+function obEnsureForDeal(deal){
+  if(!deal||deal.stage<3)return;
+  let ob=db.onboardings.find(x=>x.dealId===deal.id);
+  if(ob)return ob;
+  ob=obSeedFromDeal(deal);
+  db.onboardings.push(ob);
+  api('saveOnboarding',{ob});
+  return ob;
+}
+
+// Save a single field on an onboarding row. Debounced via per-field key.
+let obSavePending={};
+function obSaveField(obId,field,value){
+  const ob=db.onboardings.find(x=>x.id===obId);if(!ob)return;
+  ob[field]=value;ob.updatedAt=new Date().toISOString();
+  clearTimeout(obSavePending[obId+field]);
+  obSavePending[obId+field]=setTimeout(()=>{api('saveOnboarding',{ob});sL();},250);
+}
+// Save a single item status on an onboarding row.
+function obSaveItemStatus(obId,key,status){
+  const ob=db.onboardings.find(x=>x.id===obId);if(!ob)return;
+  const it=(ob.items||[]).find(i=>i.key===key);if(!it)return;
+  it.status=status;
+  if(status==='completed'&&!it.completedAt)it.completedAt=new Date().toISOString();
+  if(status!=='completed')it.completedAt='';
+  ob.updatedAt=new Date().toISOString();
+  api('saveOnboarding',{ob});sL();
+}
+function obSaveItemField(obId,key,field,value){
+  const ob=db.onboardings.find(x=>x.id===obId);if(!ob)return;
+  const it=(ob.items||[]).find(i=>i.key===key);if(!it)return;
+  it[field]=value;ob.updatedAt=new Date().toISOString();
+  api('saveOnboarding',{ob});sL();
+}
+// Add a designer note (rep notes side drawer)
+function obAddNote(obId,content){
+  const ob=db.onboardings.find(x=>x.id===obId);if(!ob)return;
+  if(!Array.isArray(ob.repNotes))ob.repNotes=[];
+  ob.repNotes.push({id:'N-'+Date.now(),content,createdAt:new Date().toISOString()});
+  ob.updatedAt=new Date().toISOString();
+  api('saveOnboarding',{ob});sL();
+}
+
+function rOnboarding(c,tr){
+  // Auto-backfill: any stage-3+ deal without an onboarding row gets one. This handles
+  // both pre-existing paid deals (one-time backfill) and newly paid deals.
+  db.deals.filter(d=>d.stage>=3).forEach(d=>obEnsureForDeal(d));
+
+  tr.innerHTML=`<button class="btn btn-sm" onclick="xCSV('ob')">↓ CSV</button>`;
+
+  const rows=db.onboardings.slice().sort((a,b)=>(b.closeDate||'').localeCompare(a.closeDate||''));
+  const hasFilters=obSearch||Object.values(obFilters).some(v=>v);
+  const filtered=rows.filter(r=>{
+    if(obSearch){
+      const q=obSearch.toLowerCase();
+      if(!(r.businessName||'').toLowerCase().includes(q)&&
+         !(r.customerName||'').toLowerCase().includes(q))return false;
+    }
+    if(obFilters.webStatus&&(r.websiteStatus||'not_started')!==obFilters.webStatus)return false;
+    if(obFilters.rep&&(r.onboardingRep||'')!==obFilters.rep)return false;
+    if(obFilters.feeCollected&&(r.launchFeeCollected||'no')!==obFilters.feeCollected)return false;
+    if(obFilters.designBrief&&(r.designBrief||'no')!==obFilters.designBrief)return false;
+    if(obFilters.domainType&&(r.domainType||'new')!==obFilters.domainType)return false;
+    if(obFilters.googleAccess&&(r.googleAccess||'no')!==obFilters.googleAccess)return false;
+    // Per-item filters
+    for(const t of OB_TASKS){
+      const f=obFilters[t.key];if(!f)continue;
+      const s=obItemStatus(r,t.key);if(s==='n/a'||s!==f)return false;
+    }
+    return true;
+  });
+
+  // Pull rep list from active sources + REPS so contractors and salespeople both surface
+  const repPool=Array.from(new Set([
+    ...(db.sources||[]).filter(s=>(s.status||'').toLowerCase()==='active').map(s=>s.contact||s.name).filter(Boolean),
+    ...REPS
+  ])).sort();
+
+  const yesNoOpts=[{v:'yes',l:'Yes'},{v:'no',l:'No'}];
+  const statusOpts=[{v:'completed',l:'Completed'},{v:'outstanding',l:'Outstanding'}];
+
+  // Cell style helpers (inlined to avoid extra CSS — mirrors Atlas's inline-style pattern)
+  const cellSt=`padding:10px 12px;border-bottom:1px solid var(--bo);font-size:12px;white-space:nowrap;color:var(--tx);vertical-align:middle`;
+  const headSt=`padding:10px 12px;font-weight:700;font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--bo);white-space:nowrap;position:sticky;top:0;background:var(--bg);z-index:2;text-align:left`;
+  // First-column header AND filter cells must also be sticky-left so they don't scroll off
+  // when the user scrolls right (matches Atlas's stacked sticky behaviour).
+  const stickyHeadSt=headSt+`;position:sticky;left:0;z-index:4;background:var(--bg);box-shadow:2px 0 4px -2px rgba(0,0,0,0.08)`;
+  const filterSt=`padding:4px 8px;border-bottom:1px solid var(--bo);position:sticky;top:37px;background:var(--bg);z-index:2`;
+  const stickyFilterSt=filterSt+`;left:0;z-index:4;box-shadow:2px 0 4px -2px rgba(0,0,0,0.08)`;
+  const stickyCell=`padding:10px 12px;border-bottom:1px solid var(--bo);font-size:12px;white-space:nowrap;color:var(--tx);vertical-align:middle;position:sticky;left:0;background:var(--su);z-index:1;font-weight:700;color:var(--pu);cursor:pointer;min-width:160px;box-shadow:2px 0 4px -2px rgba(0,0,0,0.08)`;
+
+  const COL_HEADERS=[
+    'Business Name','Plan','Amount','1st Draft Due','Website Status',
+    'Onboarding Rep','Notes','Sales Rep','Close Date','Launch Fee','Fee Collected',
+    'Design Brief','Domain Type','Google Access','Published URL','Published Date','Published By',
+    ...OB_TASKS.map(t=>t.label)
+  ];
+
+  const filterCell=(html)=>`<td style="${filterSt}">${html||''}</td>`;
+  const filterSel=(field,opts)=>{
+    const v=obFilters[field]||'';
+    return `<select onchange="obFilters['${field}']=this.value;render()" style="width:100%;padding:3px 4px;border-radius:5px;font-size:10px;font-weight:600;border:1px solid ${v?'var(--pu)':'var(--bo)'};background:${v?'var(--pub)':'var(--su)'};color:${v?'var(--put)':'var(--mu)'};outline:none;cursor:pointer"><option value="">All</option>${opts.map(o=>`<option value="${o.v}" ${v===o.v?'selected':''}>${o.l}</option>`).join('')}</select>`;
+  };
+  const stageOpts=WEBSITE_STAGES.map(s=>({v:s.value,l:s.label}));
+  const repOpts=repPool.map(r=>({v:r,l:r}));
+  const domainOpts=[{v:'new',l:'New'},{v:'existing',l:'Existing'}];
+
+  // Mini inline select (Atlas's MiniSel pattern, completed = green)
+  const miniSel=(value,opts,onchange,extra='')=>{
+    const isPositive=value==='completed'||value==='yes'||value==='existing';
+    return `<select onchange="${onchange}(this.value)" ${extra} style="padding:4px 6px;border-radius:5px;font-size:11px;font-weight:600;border:1px solid var(--bo);background:${isPositive?'var(--gnb)':'transparent'};color:${isPositive?'var(--gn)':'var(--tx)'};outline:none;cursor:pointer">${opts.map(o=>`<option value="${o.v}" ${value===o.v?'selected':''}>${o.l}</option>`).join('')}</select>`;
+  };
+
+  // Task cell renderer (n/a renders as —, but a quick toggle to "outstanding" is exposed)
+  const taskCell=(ob,key)=>{
+    const s=obItemStatus(ob,key);
+    if(s==='n/a')return `<td style="${cellSt}"><span style="font-size:11px;color:var(--mu);cursor:pointer" onclick="obActivateTask('${ob.id}','${key}')" title="Click to activate this task">—</span></td>`;
+    return `<td style="${cellSt}">${miniSel(s,statusOpts,`obSaveItemStatus_inline_${ob.id}_${key}`)}</td>`;
+  };
+
+  // Build the rows. Because the partner CRM frontend uses string-interpolated HTML
+  // with onclick handlers, we register tiny per-row closures on window so the inline
+  // onchange calls remain simple strings.
+  // (Helper: register a global fn to call obSaveItemStatus with closure args.)
+  rows.forEach(ob=>{
+    OB_TASKS.forEach(t=>{
+      window[`obSaveItemStatus_inline_${ob.id}_${t.key}`]=(v)=>obSaveItemStatus(ob.id,t.key,v);
+    });
+  });
+
+  const bodyRows=filtered.map(r=>{
+    const stage=obStageMeta(r.websiteStatus);
+    const draftDue=r.draftDueDate||'';
+    const isOverdue=draftDue&&new Date(draftDue)<new Date()&&r.websiteStatus!=='complete';
+    const lastNote=r.repNotes&&r.repNotes.length?r.repNotes[r.repNotes.length-1].content:'';
+    return `<tr onmouseenter="this.style.background='var(--bg)'" onmouseleave="this.style.background='transparent'">
+      <td style="${stickyCell}" onclick="obOpenDetail('${r.id}')">
+        <div>${r.businessName||r.customerName||'—'}</div>
+        ${r.businessName&&r.customerName&&r.businessName!==r.customerName?`<div style="font-size:10px;font-weight:500;color:var(--mu);margin-top:2px">${r.customerName}</div>`:''}
+      </td>
+      <td style="${cellSt}">${r.plan||'—'}</td>
+      <td style="${cellSt};font-weight:700">${r.launchFeeAmount?f$(r.launchFeeAmount):'—'}</td>
+      <td style="${cellSt}"><input type="date" value="${draftDue}" onchange="obSaveField('${r.id}','draftDueDate',this.value);render()" style="padding:4px 6px;border-radius:5px;font-size:11px;border:1px solid var(--bo);background:transparent;color:${isOverdue?'#ef4444':'var(--tx)'};outline:none"></td>
+      <td style="${cellSt}"><select onchange="obSaveField('${r.id}','websiteStatus',this.value);render()" style="padding:4px 6px;border-radius:5px;font-size:11px;font-weight:600;border:1px solid ${stage.color}40;background:${stage.color}12;color:${stage.color};outline:none;cursor:pointer">${WEBSITE_STAGES.map(s=>`<option value="${s.value}" ${(r.websiteStatus||'not_started')===s.value?'selected':''}>${s.label}</option>`).join('')}</select></td>
+      <td style="${cellSt}"><select onchange="obSaveField('${r.id}','onboardingRep',this.value)" style="padding:4px 6px;border-radius:5px;font-size:11px;font-weight:600;border:1px solid var(--bo);background:transparent;color:${r.onboardingRep?'var(--tx)':'var(--mu)'};outline:none;cursor:pointer;min-width:120px"><option value="">— Assign Rep —</option>${repPool.map(p=>`<option value="${p}" ${r.onboardingRep===p?'selected':''}>${p}</option>`).join('')}</select></td>
+      <td style="${cellSt};cursor:pointer" onclick="obOpenNotes('${r.id}')">
+        <div style="display:flex;align-items:center;gap:6px;max-width:140px">
+          ${lastNote?`<span style="font-size:11px;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px">${lastNote.replace(/</g,'&lt;')}</span>`:`<span style="font-size:11px;color:var(--mu);font-style:italic">Add notes...</span>`}
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--mu)" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </div>
+      </td>
+      <td style="${cellSt}">${r.salesRep||'—'}</td>
+      <td style="${cellSt}">${obFmtDate(r.closeDate)}</td>
+      <td style="${cellSt};font-weight:600">${r.launchFeeAmount?f$(r.launchFeeAmount):'—'}</td>
+      <td style="${cellSt}">${miniSel(r.launchFeeCollected||'no',yesNoOpts,`obSaveFieldClosure_${r.id}_launchFeeCollected`)}</td>
+      <td style="${cellSt}"><span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:${r.designBrief==='yes'?'var(--gnb)':'var(--bg)'};color:${r.designBrief==='yes'?'var(--gn)':'var(--mu)'}">${r.designBrief==='yes'?'Yes':'No'}</span></td>
+      <td style="${cellSt}">${miniSel(r.domainType||'new',domainOpts,`obSaveFieldClosure_${r.id}_domainType`)}</td>
+      <td style="${cellSt}">${miniSel(r.googleAccess||'no',yesNoOpts,`obSaveFieldClosure_${r.id}_googleAccess`)}</td>
+      <td style="${cellSt}"><input type="text" value="${(r.publishedUrl||'').replace(/"/g,'&quot;')}" onblur="obSaveField('${r.id}','publishedUrl',this.value)" placeholder="URL..." style="width:140px;padding:4px 6px;border-radius:5px;font-size:11px;border:1px solid var(--bo);background:transparent;color:var(--tx);outline:none"></td>
+      <td style="${cellSt}"><input type="date" value="${r.publishedDate||''}" onchange="obSaveField('${r.id}','publishedDate',this.value)" style="padding:4px 6px;border-radius:5px;font-size:11px;border:1px solid var(--bo);background:transparent;color:var(--tx);outline:none"></td>
+      <td style="${cellSt}">${r.publishedBy||'—'}</td>
+      ${OB_TASKS.map(t=>taskCell(r,t.key)).join('')}
+    </tr>`;
+  }).join('');
+
+  // Closure helpers for inline-edit selects
+  filtered.forEach(ob=>{
+    ['launchFeeCollected','domainType','googleAccess'].forEach(f=>{
+      window[`obSaveFieldClosure_${ob.id}_${f}`]=(v)=>{obSaveField(ob.id,f,v);render();};
+    });
+  });
+
+  c.innerHTML=`
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div style="font-size:13px;color:var(--mu);font-weight:600">${filtered.length} of ${rows.length} customers in onboarding</div>
+    <div style="display:flex;gap:8px">
+      <input value="${obSearch.replace(/"/g,'&quot;')}" placeholder="Search by business or customer name..." onkeyup="if(event.key==='Enter'){obSearch=this.value;render()}else{obSearch=this.value}" oninput="obSearch=this.value;clearTimeout(window.__obSearchT);window.__obSearchT=setTimeout(()=>render(),200)" style="width:320px;padding:7px 12px;border:1px solid var(--bm);border-radius:var(--r);background:var(--su);color:var(--tx);font-size:13px;outline:none">
+      ${hasFilters?`<button class="btn btn-sm" onclick="obSearch='';Object.keys(obFilters).forEach(k=>obFilters[k]='');render()">Clear filters</button>`:''}
+    </div>
+  </div>
+  ${rows.length===0?`<div class="card" style="padding:48px;text-align:center;color:var(--mu);font-size:13px">No deals in onboarding yet. When a deal reaches stage 3 (Fee collected), it lands here automatically.</div>`:`
+  <div style="background:var(--su);border-radius:var(--rl);border:1px solid var(--bo);overflow:auto;max-height:calc(100vh - 220px)">
+    <table style="width:max-content;min-width:100%;border-collapse:separate;border-spacing:0">
+      <thead>
+        <tr>
+          <th style="${stickyHeadSt}">${COL_HEADERS[0]}</th>
+          ${COL_HEADERS.slice(1).map(h=>`<th style="${headSt}">${h}</th>`).join('')}
+        </tr>
+        <tr>
+          <td style="${stickyFilterSt}"></td>
+          ${filterCell()}
+          ${filterCell()}
+          ${filterCell()}
+          ${filterCell(filterSel('webStatus',stageOpts))}
+          ${filterCell(filterSel('rep',repOpts))}
+          ${filterCell()}
+          ${filterCell()}
+          ${filterCell()}
+          ${filterCell()}
+          ${filterCell(filterSel('feeCollected',yesNoOpts))}
+          ${filterCell(filterSel('designBrief',yesNoOpts))}
+          ${filterCell(filterSel('domainType',domainOpts))}
+          ${filterCell(filterSel('googleAccess',yesNoOpts))}
+          ${filterCell()}
+          ${filterCell()}
+          ${filterCell()}
+          ${OB_TASKS.map(t=>filterCell(filterSel(t.key,statusOpts))).join('')}
+        </tr>
+      </thead>
+      <tbody>${bodyRows||`<tr><td colspan="${COL_HEADERS.length}" style="padding:48px;text-align:center;color:var(--mu);font-size:13px">No customers match your filters</td></tr>`}</tbody>
+    </table>
+  </div>`}`;
+}
+
+// Flip an n/a task into outstanding so the contractor can work it.
+function obActivateTask(obId,key){obSaveItemStatus(obId,key,'outstanding');render();}
+
+// Notes side drawer
+function obOpenNotes(obId){obNotesPanel=obId;obNotesDraft='';renderObNotesPanel();}
+function obCloseNotes(){obNotesPanel=null;obNotesDraft='';renderObNotesPanel();}
+function obSubmitNote(){if(!obNotesPanel||!obNotesDraft.trim())return;obAddNote(obNotesPanel,obNotesDraft.trim());obNotesDraft='';renderObNotesPanel();render();}
+
+function renderObNotesPanel(){
+  let el=document.getElementById('ob-notes-panel');
+  if(!obNotesPanel){if(el)el.remove();return;}
+  const ob=db.onboardings.find(x=>x.id===obNotesPanel);
+  if(!ob){if(el)el.remove();return;}
+  if(!el){el=document.createElement('div');el.id='ob-notes-panel';document.body.appendChild(el);}
+  const notes=Array.isArray(ob.repNotes)?ob.repNotes:[];
+  el.style.cssText='position:fixed;right:0;top:0;bottom:0;width:400px;background:var(--su);border-left:1px solid var(--bo);box-shadow:-8px 0 32px rgba(0,0,0,0.12);z-index:100;display:flex;flex-direction:column';
+  el.innerHTML=`
+    <div style="padding:20px 24px;border-bottom:1px solid var(--bo);display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-weight:800;font-size:15px;color:var(--tx)">${ob.businessName||ob.customerName||'—'}</div>
+        <div style="font-size:12px;color:var(--mu);margin-top:2px">Onboarding notes — visible to assigned rep</div>
+      </div>
+      <button onclick="obCloseNotes()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--mu);width:auto;padding:0">×</button>
+    </div>
+    <div style="flex:1;padding:24px;overflow-y:auto;display:flex;flex-direction:column;gap:10px">
+      ${notes.length===0?`<p style="font-size:13px;color:var(--mu);font-style:italic;margin:0">No notes yet.</p>`:''}
+      ${notes.map(n=>`<div style="padding:10px 14px;background:var(--bg);border-radius:8px;font-size:13px;color:var(--tx);line-height:1.6;white-space:pre-wrap"><div style="font-size:11px;color:var(--mu);margin-bottom:4px">${new Date(n.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>${n.content.replace(/</g,'&lt;')}</div>`).join('')}
+      <textarea id="ob-notes-draft" placeholder="Add a note..." rows="4" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--bo);background:var(--bg);color:var(--tx);font-size:13px;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box" oninput="obNotesDraft=this.value">${obNotesDraft}</textarea>
+    </div>
+    <div style="padding:16px 24px;border-top:1px solid var(--bo);display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn" onclick="obCloseNotes()">Cancel</button>
+      <button class="btn btn-p" onclick="obSubmitNote()" ${obNotesDraft.trim()?'':'disabled style="opacity:.5;cursor:not-allowed"'}>Save note</button>
+    </div>`;
+}
+
+// Detail view: opens the deal in the existing deal modal so users can see deal context.
+function obOpenDetail(obId){
+  const ob=db.onboardings.find(x=>x.id===obId);if(!ob)return;
+  if(ob.dealId&&typeof openDeal==='function')openDeal(ob.dealId);
 }
 
 let invFilter='all';
@@ -875,7 +1224,10 @@ function confAdv(id,s){
   if(s===2){const u=document.getElementById('af-u')?.value.trim();if(!u){alert('URL required');return;}d.s2d=t;d.s2u=u;d.s2b=document.getElementById('af-b')?.value||'Design Team';}
   else if(s===3){const sr=document.getElementById('af-s')?.value.trim();if(!sr){alert('Stripe ref required');return;}d.s3d=t;d.s3a=parseFloat(document.getElementById('af-a')?.value)||0;d.s3r=sr;}
   else if(s===4){const rf=document.getElementById('af-r')?.value.trim();if(!rf){alert('Payment ref required');return;}d.s4d=t;d.s4a=parseFloat(document.getElementById('af-p')?.value)||0;d.s4m=document.getElementById('af-m')?.value;d.s4r=rf;d.s4ab=document.getElementById('af-ab')?.value;}
-  d.stage=s;api('saveDeal',{deal:d});sL();cM();render();toast(`Stage ${s} — ${SL[s]} confirmed`);
+  d.stage=s;api('saveDeal',{deal:d});
+  // Trigger onboarding on "Fee collected" — deal is paid, contractors take over.
+  if(s>=3)obEnsureForDeal(d);
+  sL();cM();render();toast(`Stage ${s} — ${SL[s]} confirmed`);
 }
 
 // ── ADD DEAL ──────────────────────────────────────────────────
@@ -1169,6 +1521,10 @@ function xCSV(type){
   else if(type==='deals'){h=['ID','Customer','Email','Rep','Plan','MRR','Commission','Source','Stage','Date','S2 Date','URL','S3 Date','Fee','Stripe Ref','S4 Date','Paid','Method','Ref','Approved'];r=db.deals.map(d=>[d.id,d.customer,d.email,d.rep,d.plan,d.mrr,d.commission,d.srcName,d.stage,d.s1d,d.s2d,d.s2u,d.s3d,d.s3a,d.s3r,d.s4d,d.s4a,d.s4m,d.s4r,d.s4ab]);}
   else if(type==='pay'){const pd=db.deals.filter(d=>d.stage===4);h=['Deal ID','Customer','Partner','Amount','Method','Reference','Date','Approved'];r=pd.map(d=>[d.id,d.customer,d.srcName,d.s4a,d.s4m,d.s4r,d.s4d,d.s4ab]);}
   else if(type==='inv'){h=['ID','Client','Email','Issued','Due','Total','Status'];r=db.invoices.map(i=>[i.id,i.cn,i.ce,i.id2,i.dd,i.tot,i.st]);}
+  else if(type==='ob'){
+    h=['Onboarding ID','Deal ID','Business','Customer','Plan','Fee','Fee Collected','Website Status','Onboarding Rep','Sales Rep','Close Date','Draft Due','Published URL','Published Date',...OB_TASKS.map(t=>t.label)];
+    r=db.onboardings.map(o=>[o.id,o.dealId,o.businessName||'',o.customerName||'',o.plan||'',o.launchFeeAmount||'',o.launchFeeCollected||'',o.websiteStatus||'',o.onboardingRep||'',o.salesRep||'',o.closeDate||'',o.draftDueDate||'',o.publishedUrl||'',o.publishedDate||'',...OB_TASKS.map(t=>obItemStatus(o,t.key))]);
+  }
   const csv=[h,...r].map(row=>row.map(c=>`"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
   const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download=`zing-${type}-${td()}.csv`;a.click();toast('Exported');
 }

@@ -768,7 +768,6 @@ function rOnboarding(c,tr){
       ${hasFilters?`<button class="btn btn-sm" onclick="obSearch='';Object.keys(obFilters).forEach(k=>obFilters[k]='');render()">Clear filters</button>`:''}
     </div>
   </div>
-  ${rows.length===0?`<div class="card" style="padding:48px;text-align:center;color:var(--mu);font-size:13px">No deals in onboarding yet. When a deal reaches stage 3 (Fee collected), it lands here automatically.</div>`:`
   <div style="background:var(--su);border-radius:var(--rl);border:1px solid var(--bo);overflow:auto;max-height:calc(100vh - 220px)">
     <table style="width:max-content;min-width:100%;border-collapse:separate;border-spacing:0">
       <thead>
@@ -797,9 +796,9 @@ function rOnboarding(c,tr){
           ${OB_TASKS.map(t=>filterCell(filterSel(t.key,statusOpts))).join('')}
         </tr>
       </thead>
-      <tbody>${bodyRows||`<tr><td colspan="${COL_HEADERS.length}" style="padding:48px;text-align:center;color:var(--mu);font-size:13px">No customers match your filters</td></tr>`}</tbody>
+      <tbody>${bodyRows||`<tr><td colspan="${COL_HEADERS.length}" style="padding:48px;text-align:center;color:var(--mu);font-size:13px">${rows.length===0?'No deals in onboarding yet. Advance a deal to stage 3 (Fee collected) in the Deals tab and it lands here automatically.':'No customers match your filters'}</td></tr>`}</tbody>
     </table>
-  </div>`}`;
+  </div>`;
 }
 
 // Flip an n/a task into outstanding so the contractor can work it.
